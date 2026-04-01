@@ -1,0 +1,53 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Logs - Ollama Router Admin{% endblock %}
+{% block header_title %}Logs{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Tab Navigation -->
+    <div class="border-b border-gray-700">
+        <nav class="flex space-x-8" aria-label="Tabs">
+            <button id="tab-historical" onclick="switchTab('historical')" class="tab-btn px-1 py-4 text-sm font-medium border-b-2 border-blue-500 text-blue-500">
+                历史日志
+            </button>
+            <button id="tab-realtime" onclick="switchTab('realtime')" class="tab-btn px-1 py-4 text-sm font-medium border-b-2 border-transparent text-gray-400 hover:text-gray-300">
+                实时日志
+            </button>
+        </nav>
+    </div>
+
+    <!-- Tab Content -->
+    <div id="content-historical" class="tab-content">
+        {% include "admin/_logs_table.html" %}
+    </div>
+    <div id="content-realtime" class="tab-content hidden">
+        {% include "admin/_logs_stream.html" %}
+    </div>
+</div>
+
+<script>
+function switchTab(tab) {
+    // Update button styles
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('border-blue-500', 'text-blue-500');
+        btn.classList.add('border-transparent', 'text-gray-400');
+    });
+    document.getElementById('tab-' + tab).classList.remove('border-transparent', 'text-gray-400');
+    document.getElementById('tab-' + tab).classList.add('border-blue-500', 'text-blue-500');
+
+    // Update content visibility
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.add('hidden');
+    });
+    document.getElementById('content-' + tab).classList.remove('hidden');
+
+    // Handle SSE connection for realtime tab
+    if (tab === 'realtime') {
+        startLogStream();
+    } else {
+        stopLogStream();
+    }
+}
+</script>
+{% endblock %}

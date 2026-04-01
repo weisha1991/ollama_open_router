@@ -1,0 +1,26 @@
+listen: "0.0.0.0:11435"
+
+upstream: "https://ollama.com/v1"
+
+keys:
+  - ${OLLAMA_API_KEY_1}
+  - ${OLLAMA_API_KEY_2}
+  - ${OLLAMA_API_KEY_3}
+  - ${OLLAMA_API_KEY_4}
+  - ${OLLAMA_API_KEY_5}
+  - ${OLLAMA_API_KEY_6}
+
+cooldown:
+  session_limit_hours: 72
+  rate_limit_hours: 4
+
+admin:
+  username: "admin"
+  password: "${ADMIN_PASSWORD:-changeme}"
+  session_secret: "${ADMIN_SECRET:-change-me-to-random-secret}"
+
+logging:
+  level: info
+  file: "logs/ollama_router.log"
+  max_size_mb: 10
+  backup_count: 5

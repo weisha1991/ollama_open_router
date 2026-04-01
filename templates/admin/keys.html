@@ -1,0 +1,20 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Keys - Ollama Router Admin{% endblock %}
+{% block header_title %}API Keys Management{% endblock %}
+
+{% block content %}
+<div class="bg-gray-800 rounded-lg border border-gray-700 shadow-sm p-6 mb-6">
+    <h2 class="text-lg font-medium text-white mb-4">Add New Key</h2>
+    <form hx-post="/admin/api/keys" hx-swap="none" class="flex gap-4" id="add-key-form">
+        <input type="text" name="key" required placeholder="Enter new API key (e.g., sk-...)" class="flex-1 px-4 py-2 bg-gray-900 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+        <button type="submit" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-gray-800 transition-colors">
+            Add Key
+        </button>
+    </form>
+</div>
+
+<div id="keys-container" hx-get="/admin/api/keys/table" hx-trigger="every 30s, keyChanged from:body" hx-swap="innerHTML">
+    {% include "admin/_keys_table.html" %}
+</div>
+{% endblock %}

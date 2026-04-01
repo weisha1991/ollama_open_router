@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Ollama Router Admin{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gray: {
+                            850: '#1f2937',
+                            900: '#111827',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #111827; color: #f3f4f6; }
+        .htmx-indicator { display: none; }
+        .htmx-request .htmx-indicator { display: inline-block; }
+        .htmx-request.htmx-indicator { display: inline-block; }
+    </style>
+    <meta name="htmx-config" content='{"defaultSwapStyle":"innerHTML"}'>
+    <script>
+        document.addEventListener('htmx:responseError', function(evt) {
+            try {
+                var detail = JSON.parse(evt.detail.xhr.response);
+                alert(detail.detail || 'Request failed');
+            } catch(e) {
+                alert('Request failed (' + evt.detail.xhr.status + ')');
+            }
+        });
+        document.addEventListener('htmx:afterRequest', function(evt) {
+            if (evt.detail.successful && evt.detail.xhr.getResponseHeader('HX-Redirect')) {
+                var form = evt.detail.elt;
+                if (form && form.tagName === 'FORM') form.reset();
+            }
+        });
+    </script>
+</head>
+<body class="bg-gray-900 text-gray-100 h-screen flex overflow-hidden">
+    <aside class="w-64 bg-gray-800 border-r border-gray-700 flex-col hidden md:flex z-10 transition-transform duration-300 ease-in-out" id="sidebar">
+        <div class="h-16 flex items-center px-6 border-b border-gray-700">
+            <span class="text-xl font-bold text-white tracking-wide">Ollama Router</span>
+        </div>
+        <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+            <a href="/admin/dashboard" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-700 transition-colors {% if request and request.url.path == '/admin/dashboard' %}bg-gray-700 text-white font-medium{% else %}text-gray-300{% endif %}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path></svg>
+                Dashboard
+            </a>
+            <a href="/admin/keys" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-700 transition-colors {% if request and request.url.path == '/admin/keys' %}bg-gray-700 text-white font-medium{% else %}text-gray-300{% endif %}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
+                Keys
+            </a>
+            <a href="/admin/history" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-700 transition-colors {% if request and request.url.path == '/admin/history' %}bg-gray-700 text-white font-medium{% else %}text-gray-300{% endif %}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                History
+            </a>
+            <a href="/admin/logs" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-700 transition-colors {% if request and request.url.path == '/admin/logs' %}bg-gray-700 text-white font-medium{% else %}text-gray-300{% endif %}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414 1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Logs
+            </a>
+        </nav>
+    </aside>
+
+    <div id="sidebar-backdrop" class="fixed inset-0 bg-black/50 z-0 hidden md:hidden" onclick="document.getElementById('sidebar').classList.add('hidden'); this.classList.add('hidden');"></div>
+
+    <div class="flex-1 flex flex-col h-screen overflow-hidden">
+        <header class="h-16 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-4 sm:px-6">
+            <div class="flex items-center">
+                <button class="md:hidden text-gray-400 hover:text-white mr-4 focus:outline-none" onclick="document.getElementById('sidebar').classList.toggle('hidden'); document.getElementById('sidebar').classList.toggle('absolute'); document.getElementById('sidebar').classList.toggle('h-full'); document.getElementById('sidebar-backdrop').classList.toggle('hidden');">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                </button>
+                <h1 class="text-xl font-semibold text-white">{% block header_title %}Admin Panel{% endblock %}</h1>
+            </div>
+            <form method="POST" action="/admin/api/logout" class="m-0">
+                <button type="submit" class="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 focus:ring-offset-gray-800 transition-colors">
+                    Logout
+                </button>
+            </form>
+        </header>
+
+        <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-900 p-4 sm:p-6 lg:p-8">
+            <div class="max-w-7xl mx-auto">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+</body>
+</html>

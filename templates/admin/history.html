@@ -1,0 +1,10 @@
+{% extends "admin/base.html" %}
+
+{% block title %}History - Ollama Router Admin{% endblock %}
+{% block header_title %}Request History{% endblock %}
+
+{% block content %}
+<div id="history-container" hx-get="/admin/api/history/table" hx-trigger="every 30s" hx-swap="innerHTML">
+    {% include "admin/_history_table.html" %}
+</div>
+{% endblock %}
