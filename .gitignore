@@ -10,7 +10,11 @@ env/
 .ruff_cache/
 .mypy_cache/
 
+# Runtime directories (keep .gitkeep)
 state/
+logs/
+!state/.gitkeep
+!logs/.gitkeep
 
 config.yaml
 .env
@@ -18,4 +22,3 @@ config.yaml
 
 # Worktrees
 .worktrees/
-logs
