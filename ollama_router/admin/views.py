@@ -45,16 +45,22 @@ def _build_keys(selector: KeySelector) -> list[dict]:
 
 def _build_requests(history) -> list[dict]:
     # Support both RequestHistory object and legacy deque
-    if hasattr(history, 'get_all'):
+    if hasattr(history, "get_all"):
         records = history.get_all()
         return [
             {
-                "time": r.timestamp.isoformat() if hasattr(r, 'timestamp') else r.get("timestamp", "-"),
-                "method": r.method if hasattr(r, 'method') else r.get("method", "-"),
-                "path": r.path if hasattr(r, 'path') else r.get("path", "-"),
-                "status": r.status_code if hasattr(r, 'status_code') else r.get("status_code", 0),
-                "key_id": r.key_id if hasattr(r, 'key_id') else r.get("key_id", "-"),
-                "latency": r.latency_ms if hasattr(r, 'latency_ms') else r.get("latency_ms", r.get("latency", 0)),
+                "time": r.timestamp.isoformat()
+                if hasattr(r, "timestamp")
+                else r.get("timestamp", "-"),
+                "method": r.method if hasattr(r, "method") else r.get("method", "-"),
+                "path": r.path if hasattr(r, "path") else r.get("path", "-"),
+                "status": r.status_code
+                if hasattr(r, "status_code")
+                else r.get("status_code", 0),
+                "key_id": r.key_id if hasattr(r, "key_id") else r.get("key_id", "-"),
+                "latency": r.latency_ms
+                if hasattr(r, "latency_ms")
+                else r.get("latency_ms", r.get("latency", 0)),
             }
             for r in reversed(records)
         ]
@@ -76,6 +82,7 @@ def _build_requests(history) -> list[dict]:
 def create_admin_views_router() -> APIRouter:
     router = APIRouter(tags=["admin-views"])
 
+    @router.get("/admin")
     @router.get("/admin/")
     async def admin_root() -> RedirectResponse:
         return RedirectResponse(url="/admin/dashboard", status_code=302)

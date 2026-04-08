@@ -58,7 +58,8 @@ class Config:
     listen: str
     upstream: str
     keys: list[str]
-    cooldown_session_hours: int = 72
+    cooldown_session_hours: int = 5
+    cooldown_weekly_hours: int = 168
     cooldown_rate_hours: int = 4
     proxy_http: str | None = None
     proxy_https: str | None = None
@@ -150,7 +151,8 @@ def load_config(path: str) -> Config:
         listen=data.get("listen", "127.0.0.1:11435"),
         upstream=data.get("upstream", "https://ollama.com/v1"),
         keys=keys,
-        cooldown_session_hours=data.get("cooldown", {}).get("session_limit_hours", 72),
+        cooldown_session_hours=data.get("cooldown", {}).get("session_limit_hours", 5),
+        cooldown_weekly_hours=data.get("cooldown", {}).get("weekly_limit_hours", 168),
         cooldown_rate_hours=data.get("cooldown", {}).get("rate_limit_hours", 4),
         proxy_http=expand_env(proxy_data.get("http")),
         proxy_https=expand_env(proxy_data.get("https")),

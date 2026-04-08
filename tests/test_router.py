@@ -6,13 +6,13 @@ from ollama_router.config import Config, get_key_id
 from ollama_router.router import create_app
 
 
-def test_router_health():
+def test_router_health(tmp_path):
     config = Config(
         listen="127.0.0.1:11435",
         upstream="https://ollama.com/v1",
         keys=["test_key"],
     )
-    app = create_app(config)
+    app = create_app(config, state_dir=str(tmp_path))
     client = TestClient(app)
 
     response = client.get("/health")

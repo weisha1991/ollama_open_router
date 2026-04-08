@@ -1,7 +1,13 @@
-import os
+import logging
 from typing import Any
 
 import httpx
+
+logger = logging.getLogger("ollama_router")
+
+# Large model responses (e.g. deepseek, qwen) can take minutes to generate.
+# 300s = 5 minutes per request should cover most cases.
+UPSTREAM_TIMEOUT = 300.0
 
 
 class ProxyClient:
@@ -12,10 +18,24 @@ class ProxyClient:
         proxy_https: str | None = None,
     ):
         self.upstream = upstream.rstrip("/")
-        self.client = httpx.AsyncClient(
-            timeout=60.0,
-            trust_env=True,
-        )
+
+        # Use an explicit proxy transport when a proxy URL is provided in config.
+        # When no proxy is configured here, do NOT create a custom transport —
+        # httpx will create its own default transport with trust_env=True, which
+        # correctly reads HTTPS_PROXY / https_proxy from the environment.
+        # (Providing a custom transport bypasses trust_env proxy routing.)
+        proxy_url = proxy_https or proxy_http
+        if proxy_url:
+            logger.info("proxy_configured url=%s", proxy_url)
+            transport = httpx.AsyncHTTPTransport(proxy=proxy_url)
+            self.client = httpx.AsyncClient(
+                timeout=httpx.Timeout(UPSTREAM_TIMEOUT, connect=30.0),
+                transport=transport,
+            )
+        else:
+            self.client = httpx.AsyncClient(
+                timeout=httpx.Timeout(UPSTREAM_TIMEOUT, connect=30.0),
+            )
 
     async def forward(
         self,

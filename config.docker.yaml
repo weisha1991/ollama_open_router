@@ -2,6 +2,11 @@ listen: "0.0.0.0:11435"
 
 upstream: "https://ollama.com/v1"
 
+proxy:
+  http: "${http_proxy}"
+  https: "${https_proxy}"
+  no_proxy: "${NO_PROXY:-localhost,127.0.0.1}"
+
 keys:
   - ${OLLAMA_API_KEY_1}
   - ${OLLAMA_API_KEY_2}
@@ -9,9 +14,11 @@ keys:
   - ${OLLAMA_API_KEY_4}
   - ${OLLAMA_API_KEY_5}
   - ${OLLAMA_API_KEY_6}
+  - ${OLLAMA_API_KEY_7}
 
 cooldown:
-  session_limit_hours: 72
+  session_limit_hours: 5
+  weekly_limit_hours: 168
   rate_limit_hours: 4
 
 admin:

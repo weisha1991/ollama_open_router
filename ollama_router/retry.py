@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
+import httpx
+
 from ollama_router.config import get_key_id
 from ollama_router.handler import CooldownInfo, RateLimitHandler
 from ollama_router.request_history import RequestHistory, RequestRecord
@@ -22,7 +24,8 @@ MAX_RETRIES = 3
 @dataclass
 class RetryResult:
     """Result of retry execution."""
-    response: object | None  # httpx.Response
+
+    response: httpx.Response | None
     success: bool
     attempts: int
     last_error: str | None = None
@@ -76,12 +79,23 @@ class RetryManager:
                 )
             except Exception as e:
                 latency = round((time.perf_counter() - start_ts) * 1000, 2)
+                key_id = get_key_id(selected_key.key)
+                logger.error(
+                    "proxy_error key_id=%s path=%s attempt=%d/%d error_type=%s error=%r latency=%.2fms",
+                    key_id,
+                    path,
+                    attempt + 1,
+                    MAX_RETRIES,
+                    type(e).__name__,
+                    e,
+                    latency,
+                )
                 self._record_request(
                     request_id=request_id,
                     method=method,
                     path=path,
                     status_code=502,
-                    key_id=get_key_id(selected_key.key),
+                    key_id=key_id,
                     latency=latency,
                 )
                 return RetryResult(
@@ -117,7 +131,7 @@ class RetryManager:
                     request_id=request_id,
                     method=method,
                     path=path,
-                    status_code=429,
+                    status_code=response.status_code,
                     key_id=get_key_id(selected_key.key),
                     latency=latency,
                 )

@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+import httpx
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from fastapi.templating import Jinja2Templates
@@ -91,23 +92,52 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
             request_id_var.reset(token)
 
 
-def create_app(config: Config) -> FastAPI:
+# Hop-by-hop headers that must not be forwarded between proxy hops.
+_HOP_BY_HOP_HEADERS = frozenset(
+    {
+        "connection",
+        "keep-alive",
+        "proxy-authenticate",
+        "proxy-authorization",
+        "te",
+        "trailers",
+        "transfer-encoding",
+        "upgrade",
+        "content-length",
+        "content-encoding",
+    }
+)
+
+
+def _safe_response_headers(response: httpx.Response) -> dict[str, str]:
+    """Extract headers from upstream response, stripping hop-by-hop headers."""
+    return {
+        k: v
+        for k, v in response.headers.items()
+        if k.lower() not in _HOP_BY_HOP_HEADERS
+    }
+
+
+def create_app(config: Config, state_dir: str = "state") -> FastAPI:
     app = FastAPI()
 
     # Setup logging and request ID middleware
     setup_logging(config)
     app.add_middleware(RequestIdMiddleware)
 
-    state_store = StateStore(state_dir="state")
+    state_store = StateStore(state_dir=state_dir)
     state_store.load()
-    config_keys = set(config.keys)
-    state_keys = set(k.key for k in state_store.keys)
-    if config_keys != state_keys:
-        state_store.keys = [KeyState(key=k) for k in config.keys]
+    config_key_set = set(config.keys)
+    state_keys_dict = {k.key: k for k in state_store.keys}
+
+    keys_from_config = [state_keys_dict.get(k, KeyState(key=k)) for k in config.keys]
+    admin_added = [ks for ks in state_store.keys if ks.key not in config_key_set]
+    state_store.keys = keys_from_config + admin_added
 
     selector = KeySelector(state_store.keys)
     handler = RateLimitHandler(
         cooldown_session_hours=config.cooldown_session_hours,
+        cooldown_weekly_hours=config.cooldown_weekly_hours,
         cooldown_rate_hours=config.cooldown_rate_hours,
     )
     proxy = ProxyClient(
@@ -196,7 +226,9 @@ def create_app(config: Config) -> FastAPI:
             if result.last_error == "No available API keys":
                 return JSONResponse(
                     status_code=503,
-                    content={"error": "No available API keys. All keys are in cooldown."},
+                    content={
+                        "error": "No available API keys. All keys are in cooldown."
+                    },
                 )
             if result.last_error and "timeout" in result.last_error.lower():
                 return JSONResponse(
@@ -206,17 +238,18 @@ def create_app(config: Config) -> FastAPI:
             if result.response:
                 return JSONResponse(
                     status_code=result.response.status_code,
-                    content=result.response.json() if hasattr(result.response, 'json') else {"error": result.last_error},
+                    content=result.response.json(),
                 )
             return JSONResponse(
                 status_code=502,
                 content={"error": result.last_error or "Proxy error"},
             )
 
+        assert result.response is not None
         return Response(
             content=result.response.content,
             status_code=result.response.status_code,
-            headers=dict(result.response.headers),
+            headers=_safe_response_headers(result.response),
         )
 
     @app.on_event("shutdown")
