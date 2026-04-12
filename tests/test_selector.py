@@ -1,7 +1,7 @@
 from ollama_router.state import KeySelector, KeyState, KeyStatus
 
 
-def test_selector_polling():
+def test_selector_returns_available_key():
     selector = KeySelector(
         [
             KeyState(key="key1", status=KeyStatus.AVAILABLE),
@@ -10,21 +10,27 @@ def test_selector_polling():
         ]
     )
 
-    first = selector.select()
-    assert first is not None
-    assert first.key == "key1"
+    selected = selector.select()
+    assert selected is not None
+    assert selected.key in ("key1", "key2", "key3")
 
-    second = selector.select()
-    assert second is not None
-    assert second.key == "key2"
 
-    third = selector.select()
-    assert third is not None
-    assert third.key == "key3"
+def test_selector_smart_shuffle_distributes():
+    selector = KeySelector(
+        [
+            KeyState(key="key1", status=KeyStatus.AVAILABLE),
+            KeyState(key="key2", status=KeyStatus.AVAILABLE),
+            KeyState(key="key3", status=KeyStatus.AVAILABLE),
+        ]
+    )
 
-    fourth = selector.select()
-    assert fourth is not None
-    assert fourth.key == "key1"
+    picked = set()
+    for _ in range(30):
+        result = selector.select()
+        if result:
+            picked.add(result.key)
+
+    assert len(picked) >= 2
 
 
 def test_selector_skips_cooldown():

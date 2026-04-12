@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import httpx
 
 from ollama_router.config import get_key_id
-from ollama_router.handler import CooldownInfo, RateLimitHandler
+from ollama_router.handler import CooldownInfo, KeyAction, RateLimitHandler
 from ollama_router.request_history import RequestHistory, RequestRecord
 from ollama_router.state import KeySelector, KeyState, StateStore
 
@@ -45,6 +45,12 @@ class RetryManager:
         self.handler = handler
         self.state_store = state_store
         self.history = history
+
+    def _sync_and_save(self):
+        """Sync selector state to state store and persist."""
+        self.state_store.current_index = self.selector.index
+        self.state_store.last_failed_key = self.selector.last_failed_key
+        self.state_store.save()
 
     async def execute_with_retry(
         self,
@@ -107,15 +113,48 @@ class RetryManager:
 
             latency = round((time.perf_counter() - start_ts) * 1000, 2)
 
-            # Check for rate limit
+            # Check for rate limit / auth error
             cooldown_info = self.handler.detect_cooldown(response)
             if cooldown_info:
+                if cooldown_info.action == KeyAction.DISABLE:
+                    self.selector.mark_disabled(
+                        selected_key.key,
+                        cooldown_info.reason,
+                    )
+                    self.selector.update_last_failed_key(selected_key.key)
+                    self._sync_and_save()
+                    logger.warning(
+                        "key_disabled key_id=%s reason=%s attempt=%d/%d",
+                        get_key_id(selected_key.key),
+                        cooldown_info.reason,
+                        attempt + 1,
+                        MAX_RETRIES,
+                    )
+                    if attempt < MAX_RETRIES - 1:
+                        continue
+
+                    self._record_request(
+                        request_id=request_id,
+                        method=method,
+                        path=path,
+                        status_code=response.status_code,
+                        key_id=get_key_id(selected_key.key),
+                        latency=latency,
+                    )
+                    return RetryResult(
+                        response=response,
+                        success=False,
+                        attempts=attempt + 1,
+                        last_error=f"Key disabled: {cooldown_info.reason}",
+                    )
+
                 self.selector.mark_cooldown(
                     selected_key.key,
                     cooldown_info.hours,
                     cooldown_info.reason,
                 )
-                self.state_store.save()
+                self.selector.update_last_failed_key(selected_key.key)
+                self._sync_and_save()
                 logger.info(
                     "key_cooldown key_id=%s reason=%s hours=%d attempt=%d/%d",
                     get_key_id(selected_key.key),
@@ -143,6 +182,8 @@ class RetryManager:
                 )
 
             # Success
+            self.selector.update_last_failed_key(None)
+            self.selector.last_used_key = selected_key.key
             logger.info(
                 "request_done path=%s status=%d key_id=%s",
                 path,

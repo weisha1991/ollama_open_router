@@ -8,29 +8,36 @@ from fastapi.templating import Jinja2Templates
 
 from ollama_router.admin.middleware import get_current_user
 from ollama_router.config import get_key_id
-from ollama_router.state import KeySelector
+from ollama_router.state import KeySelector, KeyStatus
 
 
 def _build_stats(selector: KeySelector, history) -> dict:
     available = sum(1 for k in selector.keys if k.is_available())
+    disabled = sum(1 for k in selector.keys if k.status == KeyStatus.DISABLED)
+    cooldown = sum(1 for k in selector.keys if k.status == KeyStatus.COOLDOWN)
     return {
         "total_keys": len(selector.keys),
         "available_keys": available,
-        "cooldown_keys": len(selector.keys) - available,
+        "cooldown_keys": cooldown,
+        "disabled_keys": disabled,
         "total_requests": len(history),
     }
 
 
 def _build_keys(selector: KeySelector) -> list[dict]:
     now = datetime.now(timezone.utc)
+    last_used_key_id = (
+        get_key_id(selector.last_used_key) if selector.last_used_key else None
+    )
     keys = []
     for k in selector.keys:
         remaining = None
         if k.cooldown_until:
             remaining = max(0, int((k.cooldown_until - now).total_seconds()))
+        key_id = get_key_id(k.key)
         keys.append(
             {
-                "id": get_key_id(k.key),
+                "id": key_id,
                 "masked_key": f"...{k.key[-4:]}" if len(k.key) > 4 else "***",
                 "status": k.status.value,
                 "cooldown_until": k.cooldown_until.isoformat()
@@ -38,6 +45,7 @@ def _build_keys(selector: KeySelector) -> list[dict]:
                 else None,
                 "cooldown_remaining_seconds": remaining,
                 "reason": k.reason,
+                "is_last_used": key_id == last_used_key_id,
             }
         )
     return keys

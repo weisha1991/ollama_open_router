@@ -134,7 +134,11 @@ def create_app(config: Config, state_dir: str = "state") -> FastAPI:
     admin_added = [ks for ks in state_store.keys if ks.key not in config_key_set]
     state_store.keys = keys_from_config + admin_added
 
-    selector = KeySelector(state_store.keys)
+    selector = KeySelector(
+        state_store.keys,
+        index=state_store.current_index,
+        last_failed_key=state_store.last_failed_key,
+    )
     handler = RateLimitHandler(
         cooldown_session_hours=config.cooldown_session_hours,
         cooldown_weekly_hours=config.cooldown_weekly_hours,
@@ -254,6 +258,8 @@ def create_app(config: Config, state_dir: str = "state") -> FastAPI:
 
     @app.on_event("shutdown")
     async def shutdown():
+        state_store.current_index = selector.index
+        state_store.last_failed_key = selector.last_failed_key
         state_store.save()
         await proxy.close()
 

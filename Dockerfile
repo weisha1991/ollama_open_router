@@ -6,6 +6,9 @@ ARG HTTP_PROXY
 ARG HTTPS_PROXY
 ARG NO_PROXY
 
+# Build argument for pip index URL (default: Tsinghua mirror)
+ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+
 # Set proxy environment variables if provided
 ENV HTTP_PROXY=${HTTP_PROXY}
 ENV HTTPS_PROXY=${HTTPS_PROXY}
@@ -18,12 +21,22 @@ COPY pyproject.toml ./
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Use Tsinghua pip mirror for faster downloads in China
-RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
+RUN pip config set global.index-url ${PIP_INDEX_URL} && \
+    pip config set global.timeout 120 && \
     pip install --no-cache-dir .
 
 # Runtime stage
 FROM registry-1.docker.io/python:3.10-slim
+
+# Build arguments for proxy (optional)
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ARG NO_PROXY
+
+# Set proxy environment variables if provided
+ENV HTTP_PROXY=${HTTP_PROXY}
+ENV HTTPS_PROXY=${HTTPS_PROXY}
+ENV NO_PROXY=${NO_PROXY}
 
 WORKDIR /app
 

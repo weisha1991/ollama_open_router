@@ -14,6 +14,8 @@ def mock_selector():
     """Create a mock KeySelector."""
     selector = MagicMock(spec=KeySelector)
     selector.keys = [KeyState(key="test-key-12345")]
+    selector.index = 0
+    selector.last_failed_key = None
     return selector
 
 
@@ -121,7 +123,13 @@ class TestRetryManager:
 
     @pytest.mark.asyncio
     async def test_rate_limit_triggers_retry_with_new_key(
-        self, retry_manager, mock_selector, mock_handler, mock_state_store, mock_proxy, mock_history
+        self,
+        retry_manager,
+        mock_selector,
+        mock_handler,
+        mock_state_store,
+        mock_proxy,
+        mock_history,
     ):
         """Test rate limit triggers retry with new key."""
         # Setup - first call returns rate limited, second succeeds
@@ -220,7 +228,13 @@ class TestRetryManager:
 
     @pytest.mark.asyncio
     async def test_rate_limit_on_last_attempt_returns_error(
-        self, retry_manager, mock_selector, mock_handler, mock_state_store, mock_proxy, mock_history
+        self,
+        retry_manager,
+        mock_selector,
+        mock_handler,
+        mock_state_store,
+        mock_proxy,
+        mock_history,
     ):
         """Test rate limit on last attempt returns error."""
         # Setup - all calls return rate limited
@@ -253,7 +267,13 @@ class TestRetryManager:
 
     @pytest.mark.asyncio
     async def test_max_retries_exhausted(
-        self, retry_manager, mock_selector, mock_handler, mock_state_store, mock_proxy, mock_history
+        self,
+        retry_manager,
+        mock_selector,
+        mock_handler,
+        mock_state_store,
+        mock_proxy,
+        mock_history,
     ):
         """Test max retries exhausted scenario."""
         # Setup - all keys get rate limited

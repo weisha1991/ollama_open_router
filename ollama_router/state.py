@@ -3,11 +3,13 @@ from datetime import datetime, timezone
 from enum import Enum
 import json
 from pathlib import Path
+import random
 
 
 class KeyStatus(Enum):
     AVAILABLE = "available"
     COOLDOWN = "cooldown"
+    DISABLED = "disabled"
 
 
 @dataclass
@@ -18,6 +20,8 @@ class KeyState:
     reason: str | None = None
 
     def is_available(self) -> bool:
+        if self.status == KeyStatus.DISABLED:
+            return False
         if self.status == KeyStatus.AVAILABLE:
             return True
         if self.cooldown_until and datetime.now(timezone.utc) > self.cooldown_until:
@@ -32,6 +36,7 @@ class StateStore:
     state_dir: str
     keys: list[KeyState] = field(default_factory=list)
     current_index: int = 0
+    last_failed_key: str | None = None
 
     def save(self):
         path = Path(self.state_dir)
@@ -50,6 +55,7 @@ class StateStore:
                 for k in self.keys
             ],
             "current_index": self.current_index,
+            "last_failed_key": self.last_failed_key,
         }
 
         with open(path / "key_states.json", "w") as f:
@@ -75,25 +81,49 @@ class StateStore:
             for k in data.get("keys", [])
         ]
         self.current_index = data.get("current_index", 0)
+        self.last_failed_key = data.get("last_failed_key")
 
 
 class KeySelector:
-    def __init__(self, keys: list[KeyState]):
+    def __init__(
+        self, keys: list[KeyState], index: int = 0, last_failed_key: str | None = None
+    ):
         self.keys = keys
-        self.index = 0
+        self.index = index % len(keys) if keys else 0
+        self.last_failed_key = last_failed_key
+        self.last_used_key: str | None = None
 
     def select(self) -> KeyState | None:
         if not self.keys:
             return None
 
-        start_index = self.index % len(self.keys)
-        for i in range(len(self.keys)):
-            idx = (start_index + i) % len(self.keys)
-            if self.keys[idx].is_available():
-                self.index = (idx + 1) % len(self.keys)
-                return self.keys[idx]
+        candidates = [k for k in self.keys if k.is_available()]
+        if not candidates:
+            return None
 
-        return None
+        selected = self._smart_pick(candidates)
+        self.index = self.keys.index(selected)
+        return selected
+
+    def _smart_pick(self, candidates: list[KeyState]) -> KeyState:
+        if len(candidates) == 1:
+            return candidates[0]
+
+        keys = list(candidates)
+
+        # Fisher-Yates shuffle
+        for i in range(len(keys) - 1, 0, -1):
+            j = random.randint(0, i)
+            keys[i], keys[j] = keys[j], keys[i]
+
+        # Move last failed key to end if present
+        if self.last_failed_key:
+            for i, k in enumerate(keys):
+                if k.key == self.last_failed_key:
+                    keys.append(keys.pop(i))
+                    break
+
+        return keys[0]
 
     def mark_cooldown(self, key: str, cooldown_hours: int, reason: str):
         from datetime import timedelta
@@ -106,3 +136,14 @@ class KeySelector:
                 )
                 k.reason = reason
                 break
+
+    def mark_disabled(self, key: str, reason: str):
+        for k in self.keys:
+            if k.key == key:
+                k.status = KeyStatus.DISABLED
+                k.cooldown_until = None
+                k.reason = reason
+                break
+
+    def update_last_failed_key(self, key: str | None):
+        self.last_failed_key = key

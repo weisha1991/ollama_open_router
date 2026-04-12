@@ -146,6 +146,7 @@ def create_admin_api_router() -> APIRouter:
         config.keys.append(key)
         selector.keys.append(KeyState(key=key))
         state_store.keys = selector.keys
+        state_store.current_index = selector.index
         state_store.save()
 
         if _is_htmx(request):
@@ -176,11 +177,12 @@ def create_admin_api_router() -> APIRouter:
         selector.keys.pop(target_index)
         config.keys = [k for k in config.keys if k != target_key]
         state_store.keys = selector.keys
-        state_store.save()
         if selector.keys:
             selector.index = selector.index % len(selector.keys)
         else:
             selector.index = 0
+        state_store.current_index = selector.index
+        state_store.save()
 
         if _is_htmx(request):
             return Response(status_code=200, headers={"HX-Redirect": "/admin/keys"})
@@ -199,6 +201,29 @@ def create_admin_api_router() -> APIRouter:
                 key_state.status = KeyStatus.AVAILABLE
                 key_state.cooldown_until = None
                 key_state.reason = None
+                state_store.current_index = selector.index
+                state_store.save()
+                if _is_htmx(request):
+                    return Response(
+                        status_code=200, headers={"HX-Redirect": "/admin/keys"}
+                    )
+                return {"ok": True, "key_id": key_id}
+
+        raise HTTPException(status_code=404, detail="Key not found")
+
+    @router.post("/keys/{key_id}/disable")
+    async def disable_key(
+        key_id: str,
+        request: Request,
+        _: str = Depends(get_current_user),
+    ) -> Response:
+        selector: KeySelector = request.app.state.selector
+        state_store: StateStore = request.app.state.state_store
+        for key_state in selector.keys:
+            if get_key_id(key_state.key) == key_id:
+                selector.mark_disabled(key_state.key, reason="admin_disabled")
+                state_store.current_index = selector.index
+                state_store.last_failed_key = selector.last_failed_key
                 state_store.save()
                 if _is_htmx(request):
                     return Response(
@@ -339,6 +364,7 @@ def create_admin_api_router() -> APIRouter:
 
         # Return error if no logging configured
         if not config.logging.file:
+
             async def error_generator():
                 yield f"event: error\ndata: {json.dumps({'error': 'Logging not configured'})}\n\n"
 
