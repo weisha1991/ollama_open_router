@@ -311,13 +311,13 @@ ADMIN_PASSWORD=admin
 ADMIN_SESSION_SECRET=your-random-secret-here
 
 # 代理（可选，公司网络）
-HTTP_PROXY=http://your-proxy.example.com:80
-HTTPS_PROXY=http://your-proxy.example.com:80
-NO_PROXY=localhost,127.0.0.1,.zte.com.cn
+HTTP_PROXY=http://your-proxy:80
+HTTPS_PROXY=http://your-proxy:80
+NO_PROXY=localhost,127.0.0.1
 ```
 
 ---
 
-**文档版本**：v1.0
-**更新日期**：2026-04-10
-**项目仓库**：`/data1/lzb/code/zte_code/ollama_open_router`
+**文档版本**：v1.1
+**更新日期**：2026-04-13
+**项目仓库**：https://github.com/weisha1991/ollama_open_router

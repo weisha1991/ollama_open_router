@@ -68,7 +68,6 @@ class Config:
     admin_password: str = "admin"
     admin_session_secret: str = "change-me"
     logging: LoggingConfig = field(default_factory=LoggingConfig)
-    model_mapping: dict[str, str] = field(default_factory=dict)
 
 
 def validate_keys(keys: list[str]) -> list[str]:
@@ -163,5 +162,4 @@ def load_config(path: str) -> Config:
         admin_session_secret=expand_env(admin_data.get("session_secret", "change-me"))
         or "change-me",
         logging=logging_config,
-        model_mapping=data.get("model_mapping", {}),
     )

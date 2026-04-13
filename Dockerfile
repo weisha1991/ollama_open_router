@@ -1,13 +1,15 @@
 # Build stage
-FROM registry-1.docker.io/python:3.10-slim AS builder
+# NOTE: Users in China may need to replace "python:3.10-slim" with a mirror,
+# e.g. "registry.cn-hangzhou.aliyuncs.com/library/python:3.10-slim"
+FROM python:3.10-slim AS builder
 
 # Build arguments for proxy (optional)
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
 ARG NO_PROXY
 
-# Build argument for pip index URL (default: Tsinghua mirror)
-ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+# Build argument for pip index URL (default: PyPI, override for mirrors)
+ARG PIP_INDEX_URL=https://pypi.org/simple
 
 # Set proxy environment variables if provided
 ENV HTTP_PROXY=${HTTP_PROXY}
@@ -26,7 +28,7 @@ RUN pip config set global.index-url ${PIP_INDEX_URL} && \
     pip install --no-cache-dir .
 
 # Runtime stage
-FROM registry-1.docker.io/python:3.10-slim
+FROM python:3.10-slim
 
 # Build arguments for proxy (optional)
 ARG HTTP_PROXY

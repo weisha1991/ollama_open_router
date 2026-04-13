@@ -28,7 +28,7 @@ Based on actual API testing:
 
 ```json
 {
-  "error": "you (username) have reached your session usage limit..."
+  "error": "you have reached your session usage limit..."
 }
 ```
 

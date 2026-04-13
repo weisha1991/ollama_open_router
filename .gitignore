@@ -20,6 +20,7 @@ config.yaml
 .env
 .gstack/
 opencode.json
+docs/superpowers/
 
 # Worktrees
 .worktrees/

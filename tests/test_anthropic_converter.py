@@ -22,10 +22,8 @@ def _make_request(**overrides):
 
 def test_basic_text_request():
     req = _make_request()
-    result = convert_anthropic_to_openai(
-        req, model_map={"claude-sonnet-4-20250514": "glm-5.1"}
-    )
-    assert result["model"] == "glm-5.1"
+    result = convert_anthropic_to_openai(req)
+    assert result["model"] == "claude-sonnet-4-20250514"
     assert len(result["messages"]) == 1
     assert result["messages"][0]["role"] == "user"
     assert result["messages"][0]["content"] == "Hello"
@@ -34,9 +32,7 @@ def test_basic_text_request():
 
 def test_system_as_string():
     req = _make_request(system="Be helpful")
-    result = convert_anthropic_to_openai(
-        req, model_map={"claude-sonnet-4-20250514": "glm-5.1"}
-    )
+    result = convert_anthropic_to_openai(req)
     assert result["messages"][0]["role"] == "system"
     assert result["messages"][0]["content"] == "Be helpful"
 
@@ -45,9 +41,7 @@ def test_system_as_list():
     req = _make_request(
         system=[{"type": "text", "text": "Part 1"}, {"type": "text", "text": "Part 2"}]
     )
-    result = convert_anthropic_to_openai(
-        req, model_map={"claude-sonnet-4-20250514": "glm-5.1"}
-    )
+    result = convert_anthropic_to_openai(req)
     assert result["messages"][0]["role"] == "system"
     assert "Part 1" in result["messages"][0]["content"]
     assert "Part 2" in result["messages"][0]["content"]
@@ -66,9 +60,7 @@ def test_tool_conversion():
             }
         ]
     )
-    result = convert_anthropic_to_openai(
-        req, model_map={"claude-sonnet-4-20250514": "glm-5.1"}
-    )
+    result = convert_anthropic_to_openai(req)
     assert "tools" in result
     assert len(result["tools"]) == 1
     assert result["tools"][0]["type"] == "function"
@@ -104,9 +96,7 @@ def test_assistant_with_tool_use():
             },
         ]
     )
-    result = convert_anthropic_to_openai(
-        req, model_map={"claude-sonnet-4-20250514": "glm-5.1"}
-    )
+    result = convert_anthropic_to_openai(req)
     assistants = [m for m in result["messages"] if m["role"] == "assistant"]
     assert len(assistants) == 1
     assert "tool_calls" in assistants[0]

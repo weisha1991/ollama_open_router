@@ -20,13 +20,8 @@ logger = logging.getLogger("ollama_router")
 
 def convert_anthropic_to_openai(
     request: anthropic_models.ClaudeMessagesRequest,
-    model_map: Optional[Dict[str, str]] = None,
-    default_model: str = "glm-5.1",
 ) -> Dict[str, Any]:
     """Convert an Anthropic Messages API request to OpenAI Chat Completions format."""
-    model_map = model_map or {}
-    openai_model = model_map.get(request.model, default_model)
-
     openai_messages: List[Dict[str, Any]] = []
 
     # System message
@@ -52,7 +47,7 @@ def convert_anthropic_to_openai(
 
     # Build OpenAI request
     openai_request: Dict[str, Any] = {
-        "model": openai_model,
+        "model": request.model,
         "messages": openai_messages,
         "max_tokens": request.max_tokens,
         "stream": request.stream,

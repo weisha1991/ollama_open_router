@@ -22,7 +22,6 @@ from ollama_router.anthropic.models import (
     ClaudeTokenCountRequest,
 )
 from ollama_router.anthropic.stream import convert_openai_stream_to_anthropic
-from ollama_router.anthropic.model_map import map_model
 
 logger = logging.getLogger("ollama_router")
 
@@ -42,31 +41,19 @@ def create_anthropic_router() -> APIRouter:
         )
 
         retry_manager = request.app.state.retry_manager
-        config = request.app.state.config
         proxy = request.app.state.proxy
 
-        model_map = getattr(config, "model_mapping", {}) or {}
-        upstream_models = set(model_map.values()) | {
-            "glm-5",
-            "glm-5.1",
-            "glm-4.7",
-            "glm-4.5-air",
-            "glm-5-turbo",
-        }
-        if claude_request.model in upstream_models:
-            target_model = claude_request.model
-        else:
-            target_model = map_model(claude_request.model, model_map)
-        openai_request = convert_anthropic_to_openai(
-            claude_request,
-            model_map=model_map,
-            default_model=target_model,
-        )
+        target_model = claude_request.model
+        if claude_request.model.startswith("claude-"):
+            target_model = "glm-5.1"
+
+        openai_request = convert_anthropic_to_openai(claude_request)
+        openai_request["model"] = target_model
 
         logger.info(
             "anthropic_request model=%s->%s stream=%s",
             claude_request.model,
-            openai_request["model"],
+            target_model,
             claude_request.stream,
         )
 
@@ -119,6 +106,29 @@ def create_anthropic_router() -> APIRouter:
             )
 
         assert result.response is not None
+
+        if result.response.status_code != 200:
+            try:
+                error_body = result.response.json()
+                error_msg = error_body.get("error", {}).get(
+                    "message", f"Upstream returned {result.response.status_code}"
+                )
+            except Exception:
+                error_msg = f"Upstream returned {result.response.status_code}"
+            logger.error(
+                "anthropic_upstream_error status=%d model=%s body=%s",
+                result.response.status_code,
+                claude_request.model,
+                str(error_msg)[:200],
+            )
+            return JSONResponse(
+                status_code=result.response.status_code,
+                content={
+                    "type": "error",
+                    "error": {"type": "api_error", "message": error_msg},
+                },
+            )
+
         try:
             openai_response = result.response.json()
         except Exception:
