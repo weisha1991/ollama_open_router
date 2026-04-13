@@ -1,52 +1,80 @@
-# Ollama Router
+<h1 align="center">Ollama Router</h1>
 
-A local proxy for [ollama.com](https://ollama.com) with automatic API key rotation, rate limit handling, and **Claude Code / OpenCode compatibility**.
+<p align="center">
+  <strong>Pool multiple ollama.com API keys behind a single endpoint with automatic rotation.</strong>
+</p>
 
-Ollama.com provides free API keys with usage limits. Ollama Router pools multiple keys behind a single endpoint, automatically rotating on rate limits — so your tools never stop working.
+<p align="center">
+  <a href="https://github.com/weisha1991/ollama_open_router/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/tests-127%20passing-brightgreen.svg" alt="127 Tests">
+  <img src="https://img.shields.io/badge/API-OpenAI%20%7C%20Anthropic-purple.svg" alt="OpenAI & Anthropic API">
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick Start</a> ·
+  <a href="#integrations">Integrations</a> ·
+  <a href="#configuration">Configuration</a> ·
+  <a href="#how-it-works">How It Works</a> ·
+  <a href="#admin-dashboard">Admin Dashboard</a> ·
+  <a href="#api-reference">API Reference</a>
+</p>
+
+---
+
+## Why Ollama Router?
+
+[ollama.com](https://ollama.com) provides free API keys for language models like GLM-5, but each key has usage limits. When you hit the limit, your application stops working.
+
+**Ollama Router solves this** by pooling multiple keys behind a single proxy endpoint. When one key gets rate-limited, it automatically rotates to the next — your tools keep running without interruption.
+
+It also provides an **Anthropic Messages API compatibility layer**, so you can connect tools like Claude Code and OpenCode directly through the proxy.
 
 ## Features
 
-- 🔄 **Automatic Key Rotation** — Seamlessly switches to the next available key on rate limit (429)
-- ⏱️ **Cooldown Management** — Tracks session limits (configurable) and rate limits per key
-- 🤖 **Claude Code Compatible** — Full Anthropic Messages API (`/v1/messages`) support with streaming, tool use, and model passthrough
-- 📡 **OpenAI API Compatible** — Transparent proxy to `/v1/chat/completions` and all upstream endpoints
-- 📊 **Admin Dashboard** — Web UI for key status, request history, real-time logs, and key management
-- 🐳 **Docker Ready** — Complete Docker and docker-compose deployment with multi-stage build
+- **Automatic Key Rotation** — Round-robin selection with automatic cooldown tracking; switches keys on 429 responses
+- **Anthropic + OpenAI Dual API** — Full `/v1/messages` (Anthropic) and `/v1/chat/completions` (OpenAI) support with streaming
+- **Claude Code Ready** — Works with Claude Code out of the box via `ANTHROPIC_BASE_URL`
+- **Admin Dashboard** — Web UI for monitoring key status, request history, and real-time logs
+- **Smart Retry** — Up to 3 retry attempts with automatic key switching on failures
+- **Docker First** — Multi-stage Docker build with docker-compose for one-command deployment
 
 ## Quick Start
 
-### Docker Compose (Recommended)
+### Docker Compose
 
 ```bash
-# 1. Clone and configure
 git clone https://github.com/weisha1991/ollama_open_router.git
 cd ollama_open_router
 cp .env.example .env
-
-# 2. Edit .env — add your ollama.com API keys
-# OLLAMA_API_KEY_1=your-key-1
-# OLLAMA_API_KEY_2=your-key-2
-
-# 3. Start
+# Edit .env to add your ollama.com API keys
 docker compose up -d
 ```
 
-Service runs at `http://127.0.0.1:11435`.
+The proxy starts at `http://127.0.0.1:11435`. That's it.
 
-### Local Install
+### From Source
 
 ```bash
+git clone https://github.com/weisha1991/ollama_open_router.git
+cd ollama_open_router
 pip install -e .
 cp config.yaml.example config.yaml
-# Edit config.yaml to add keys
+# Edit config.yaml to add your API keys
 python -m ollama_router
 ```
 
-## Usage
+### Verify
 
-### With Claude Code
+```bash
+curl http://127.0.0.1:11435/health
+```
 
-Edit `~/.claude/settings.json`:
+## Integrations
+
+### Claude Code
+
+Add to `~/.claude/settings.json`:
 
 ```json
 {
@@ -61,9 +89,9 @@ Edit `~/.claude/settings.json`:
 }
 ```
 
-> See [docs/CLAUDE_CODE_GUIDE.md](docs/CLAUDE_CODE_GUIDE.md) for detailed setup instructions.
+> 📖 See [Claude Code Setup Guide](docs/CLAUDE_CODE_GUIDE.md) for detailed instructions.
 
-### With OpenAI SDK
+### OpenAI SDK
 
 ```python
 from openai import OpenAI
@@ -79,84 +107,9 @@ response = client.chat.completions.create(
 )
 ```
 
-### With curl
+### Any OpenAI-Compatible Tool
 
-```bash
-# OpenAI Chat Completions
-curl http://127.0.0.1:11435/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{"model": "glm-5.1", "messages": [{"role": "user", "content": "Hello"}]}'
-
-# Anthropic Messages API (for Claude Code)
-curl http://127.0.0.1:11435/v1/messages \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: sk-test" \
-  -H "anthropic-version: 2023-06-01" \
-  -d '{"model": "glm-5.1", "max_tokens": 100, "messages": [{"role": "user", "content": "Hello"}]}'
-```
-
-## 快速开始
-
-### 方式一：本地运行
-
-```bash
-# 1. 安装依赖
-pip install -e .
-
-# 2. 复制配置文件
-cp config.yaml.example config.yaml
-
-# 3. 编辑配置文件，添加 API Keys
-# keys:
-#   - "${OLLAMA_API_KEY_1}"
-#   - "${OLLAMA_API_KEY_2}"
-
-# 4. 设置环境变量
-export OLLAMA_API_KEY_1=your-api-key-1
-export OLLAMA_API_KEY_2=your-api-key-2
-
-# 5. 启动服务
-python -m ollama_router
-```
-
-服务将在 `http://127.0.0.1:11435` 启动。
-
-### 方式二：Docker Compose（推荐）
-
-```bash
-# 1. 复制环境变量文件
-cp .env.example .env
-
-# 2. 编辑 .env 文件，添加 API Keys
-# OLLAMA_API_KEY_1=your-api-key-1
-# OLLAMA_API_KEY_2=your-api-key-2
-
-# 3. 创建 config.docker.yaml 符号链接（或直接使用）
-cp config.docker.yaml config.yaml
-
-# 4. 启动服务
-docker-compose up -d
-
-# 5. 查看日志
-docker-compose logs -f
-```
-
-### 方式三：Docker 单独构建
-
-```bash
-# 构建镜像
-docker build -t ollama-router .
-
-# 运行容器
-docker run -d \
-  --name ollama-router \
-  -p 11435:11435 \
-  -v $(pwd)/logs:/app/logs \
-  -v $(pwd)/state:/app/state \
-  -v $(pwd)/config.yaml:/app/config.yaml:ro \
-  --env-file .env \
-  ollama-router
-```
+Point your tool's `base_url` to `http://127.0.0.1:11435/v1` and set any non-empty `api_key`. The router handles key selection automatically.
 
 ## Configuration
 
@@ -166,14 +119,13 @@ docker run -d \
 listen: "127.0.0.1:11435"
 upstream: "https://ollama.com/v1"
 
-# Optional proxy (for corporate networks)
-proxy:
+proxy:                          # Optional — for corporate networks
   http: "${http_proxy}"
   https: "${https_proxy}"
   no_proxy: "localhost,127.0.0.1"
 
 keys:
-  - "${OLLAMA_API_KEY_1}"
+  - "${OLLAMA_API_KEY_1}"      # Use env vars for security
   - "${OLLAMA_API_KEY_2}"
 
 cooldown:
@@ -192,93 +144,108 @@ logging:
   backup_count: 5
 ```
 
-See [config.yaml.example](config.yaml.example) for a full example.
+See [config.yaml.example](config.yaml.example) for the full template.
 
 ### Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `OLLAMA_API_KEY_1..N` | ollama.com API keys | Required |
+| `OLLAMA_API_KEY_1..N` | ollama.com API keys | **Required** |
 | `ADMIN_PASSWORD` | Admin dashboard password | `changeme` |
 | `ADMIN_SECRET` | Session signing secret | Random |
-| `LOG_LEVEL` | Log level | `INFO` |
+| `LOG_LEVEL` | Log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` |
 | `HTTP_PROXY` / `HTTPS_PROXY` | Outbound proxy | — |
 
-## API Endpoints
+### Docker Build Args
 
-### Proxy Endpoints
+| Arg | Description | Default |
+|-----|-------------|---------|
+| `BASE_IMAGE` | Python base image | `python:3.10-slim` |
+| `PIP_INDEX_URL` | pip package index | `https://pypi.org/simple` |
+| `HTTP_PROXY` / `HTTPS_PROXY` | Build-time proxy | — |
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `GET /health` | GET | Health check with key status |
-| `GET /metrics` | GET | Prometheus-style metrics |
-| `/{path:path}` | * | Proxy to ollama.com (OpenAI API) |
+Example with a private registry:
 
-### Anthropic Compatible Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `POST /v1/messages` | POST | Anthropic Messages API (streaming & non-streaming) |
-| `POST /v1/messages/count_tokens` | POST | Token count estimation |
-
-Claude model names (e.g. `claude-sonnet-4-20250514`) are automatically mapped to the default upstream model. To use a specific upstream model, set it via `ANTHROPIC_DEFAULT_*_MODEL` env vars on the client side.
-
-### Admin Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `GET /admin` | GET | Admin dashboard |
-| `POST /admin/login` | POST | Login |
-| `GET /admin/api/keys` | GET | List all keys with status |
-| `POST /admin/api/keys` | POST | Add a new key |
-| `DELETE /admin/api/keys/{key_id}` | DELETE | Remove a key |
-| `POST /admin/api/keys/{key_id}/disable` | POST | Disable a key |
-| `POST /admin/api/keys/{key_id}/reset` | POST | Reset key cooldown |
-| `GET /admin/api/history` | GET | Request history |
-| `GET /admin/api/logs` | GET | Historical logs |
-| `GET /admin/api/logs/stream` | GET | SSE real-time log stream |
-
-## Admin Dashboard
-
-Visit `http://127.0.0.1:11435/admin` for the management dashboard:
-
-- **Dashboard** — Request stats and key overview
-- **Keys** — View/manage key states (available, cooldown, disabled)
-- **History** — Request history with latency and key info
-- **Logs** — Real-time log stream and download
+```bash
+docker compose build \
+  --build-arg BASE_IMAGE=registry.example.com/python:3.10-slim \
+  --build-arg PIP_INDEX_URL=https://pypi.example.com/simple
+```
 
 ## How It Works
 
 ```
-Claude Code / OpenCode / curl
-        │
-        ▼
-  Ollama Router (127.0.0.1:11435)
-   ┌────┴────┐
-   │  Key    │  Round-robin selection
-   │ Selector│  Skip keys in cooldown
-   └────┬────┘
-        │  Attach API key → forward
-        ▼
-   ollama.com/v1
-        │
-   429? ─┼─→ Mark cooldown, retry with next key (max 3)
-   200? ─┼─→ Return response
-        │
+  Claude Code / OpenCode / SDK / curl
+                 │
+                 ▼
+        Ollama Router (:11435)
+         ┌───────┴───────┐
+         │   Key Selector │  ← Round-robin with cooldown tracking
+         └───────┬───────┘
+                 │  Attach key, forward request
+                 ▼
+           ollama.com/v1
+                 │
+       ┌──── 200 ────┐
+       │              │
+    Response      ┌─ 429 ──┐
+    to client     │         │
+              Mark key    Retry with
+              cooldown    next key (×3)
 ```
+
+## Admin Dashboard
+
+Visit `http://127.0.0.1:11435/admin` to access the built-in management dashboard:
+
+| Page | Description |
+|------|-------------|
+| **Dashboard** | Real-time request stats and key health overview |
+| **Keys** | View key states (available / cooldown / disabled), add or remove keys |
+| **History** | Request log with timestamps, key IDs, status codes, and latency |
+| **Logs** | Real-time SSE log stream with level filtering and log download |
+
+## API Reference
+
+### Proxy
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Health check with key status summary |
+| `GET` | `/metrics` | Prometheus-style metrics |
+| `*` | `/{path:path}` | Transparent proxy to ollama.com |
+
+### Anthropic (Claude Code Compatible)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/v1/messages` | Anthropic Messages API — streaming and non-streaming |
+| `POST` | `/v1/messages/count_tokens` | Token count estimation |
+
+Claude model names (e.g. `claude-sonnet-4-20250514`) are automatically mapped to the default upstream model. Override with `ANTHROPIC_DEFAULT_*_MODEL` env vars on the client.
+
+### Admin
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/admin` | Dashboard UI |
+| `POST` | `/admin/login` | Session login |
+| `GET` | `/admin/api/keys` | List all keys with status |
+| `POST` | `/admin/api/keys` | Add a new key |
+| `DELETE` | `/admin/api/keys/{key_id}` | Remove a key |
+| `POST` | `/admin/api/keys/{key_id}/disable` | Disable a key |
+| `POST` | `/admin/api/keys/{key_id}/reset` | Reset key cooldown |
+| `GET` | `/admin/api/history` | Request history |
+| `GET` | `/admin/api/logs` | Historical logs |
+| `GET` | `/admin/api/logs/stream` | SSE real-time log stream |
 
 ## Development
 
 ```bash
-# Install with dev dependencies
 pip install -e ".[dev]"
-
-# Run tests (127 tests)
-pytest
-
-# Format
-ruff format .
-ruff check .
+pytest                    # 127 tests
+ruff format .             # Format
+ruff check .              # Lint
 ```
 
 ## Project Structure
@@ -287,27 +254,28 @@ ruff check .
 ollama_router/
 ├── router.py              # FastAPI app, catch-all proxy route
 ├── config.py              # YAML config with env var expansion
-├── proxy.py               # Upstream HTTP client
-├── retry.py               # Retry with key rotation
+├── proxy.py               # Upstream HTTP client (30min timeout)
+├── retry.py               # Retry manager with key rotation
 ├── handler.py             # Rate limit detection
-├── state.py               # Key state management & persistence
-├── request_context.py     # Request ID tracking (contextvars)
-├── request_history.py     # In-memory request history
-├── anthropic/             # Anthropic Messages API compatibility layer
-│   ├── routes.py          # /v1/messages, /v1/messages/count_tokens
-│   ├── converter.py       # Anthropic ↔ OpenAI format conversion
-│   ├── stream.py          # SSE stream conversion
-│   ├── models.py          # Pydantic models
-│   └── model_map.py       # Claude model name handling
-├── admin/                 # Admin UI
-│   ├── routes.py          # REST API
-│   ├── views.py           # Jinja2 templates
-│   ├── auth.py            # HMAC session tokens
-│   └── middleware.py      # Session validation
-templates/admin/           # Jinja2 HTML templates
-tests/                     # 127 tests
+├── state.py               # Key state, cooldown, persistence
+├── anthropic/             # Anthropic Messages API layer
+│   ├── routes.py          #   /v1/messages endpoints
+│   ├── converter.py       #   Anthropic ↔ OpenAI conversion
+│   ├── stream.py          #   SSE stream conversion
+│   ├── models.py          #   Pydantic models
+│   └── model_map.py       #   Model name handling
+├── admin/                 # Admin dashboard
+│   ├── routes.py          #   REST API
+│   ├── views.py           #   Jinja2 templates
+│   ├── auth.py            #   HMAC session tokens
+│   └── middleware.py      #   Session validation
+└── templates/admin/       # HTML templates
 ```
+
+## Contributing
+
+Issues and pull requests are welcome at [GitHub](https://github.com/weisha1991/ollama_open_router).
 
 ## License
 
-MIT
+[MIT](LICENSE) © DragonTensor
