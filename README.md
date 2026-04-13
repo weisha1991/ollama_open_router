@@ -20,6 +20,11 @@
   <a href="#api-reference">API Reference</a>
 </p>
 
+<p align="center">
+  🌐 <a href="README.zh-CN.md">中文文档</a>
+</p>
+</p>
+
 ---
 
 ## Why Ollama Router?
