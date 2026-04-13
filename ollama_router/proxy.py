@@ -5,9 +5,9 @@ import httpx
 
 logger = logging.getLogger("ollama_router")
 
-# Large model responses (e.g. deepseek, qwen) can take minutes to generate.
-# 300s = 5 minutes per request should cover most cases.
-UPSTREAM_TIMEOUT = 300.0
+# Claude Code coding tasks can take a very long time (complex refactors, etc.)
+# 1800s = 30 minutes per request to match typical Claude Code usage patterns.
+UPSTREAM_TIMEOUT = 1800.0
 
 
 class ProxyClient:

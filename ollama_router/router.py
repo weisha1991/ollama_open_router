@@ -14,6 +14,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from ollama_router.admin.routes import create_admin_api_router
 from ollama_router.admin.views import create_admin_views_router
+from ollama_router.anthropic.routes import create_anthropic_router
 from ollama_router.config import Config, get_key_id
 from ollama_router.handler import RateLimitHandler
 from ollama_router.metrics import metrics
@@ -164,9 +165,11 @@ def create_app(config: Config, state_dir: str = "state") -> FastAPI:
     app.state.request_history = request_history
     app.state.retry_manager = retry_manager
     app.state.templates = Jinja2Templates(directory="templates")
+    app.state.proxy = proxy
 
     app.include_router(create_admin_api_router())
     app.include_router(create_admin_views_router())
+    app.include_router(create_anthropic_router())
 
     @app.get("/health")
     async def health():
