@@ -1,7 +1,8 @@
 # Build stage
-# NOTE: Users in China may need to replace "python:3.10-slim" with a mirror,
-# e.g. "registry.cn-hangzhou.aliyuncs.com/library/python:3.10-slim"
-FROM python:3.10-slim AS builder
+# Override BASE_IMAGE for private registries, e.g.:
+#   docker compose build --build-arg BASE_IMAGE=registry.example.com/python:3.10-slim
+ARG BASE_IMAGE=python:3.10-slim
+FROM ${BASE_IMAGE} AS builder
 
 # Build arguments for proxy (optional)
 ARG HTTP_PROXY
@@ -28,7 +29,7 @@ RUN pip config set global.index-url ${PIP_INDEX_URL} && \
     pip install --no-cache-dir .
 
 # Runtime stage
-FROM python:3.10-slim
+FROM ${BASE_IMAGE}
 
 # Build arguments for proxy (optional)
 ARG HTTP_PROXY
