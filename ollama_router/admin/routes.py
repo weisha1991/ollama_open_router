@@ -4,23 +4,36 @@ import asyncio
 import json
 from collections import Counter
 from datetime import datetime, timezone
-from pathlib import Path
 
-import aiofiles
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response, status
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordRequestForm
 
 from ollama_router.admin.auth import create_session
-from ollama_router.admin.logs import filter_logs, parse_log_line, read_log_file
+from ollama_router.admin.logs import LogBroadcaster, filter_logs, read_log_file
 from ollama_router.admin.middleware import get_current_user
-from ollama_router.admin.views import _build_keys, _build_requests, _build_stats
+from ollama_router.admin.views import (
+    _build_dashboard_context,
+    _build_keys,
+    _build_requests,
+)
 from ollama_router.config import Config, get_key_id
 from ollama_router.state import KeySelector, KeyState, KeyStatus, StateStore
 
 
 def _is_htmx(request: Request) -> bool:
     return request.headers.get("hx-request") == "true"
+
+
+def _history_records_for_json(history) -> list[dict]:
+    if hasattr(history, "to_dict_list"):
+        return history.to_dict_list()
+    if hasattr(history, "get_all"):
+        records = history.get_all()
+        return [
+            item.to_dict() if hasattr(item, "to_dict") else item for item in records
+        ]
+    return list(history)
 
 
 def create_admin_api_router() -> APIRouter:
@@ -67,10 +80,11 @@ def create_admin_api_router() -> APIRouter:
         templates = request.app.state.templates
         selector: KeySelector = request.app.state.selector
         history = request.app.state.request_history
+        dashboard = _build_dashboard_context(selector, history)
         return templates.TemplateResponse(
             request=request,
             name="admin/_stats_panel.html",
-            context={"stats": _build_stats(selector, history)},
+            context={"stats": dashboard["stats"], "dashboard": dashboard},
         )
 
     @router.get("/keys/table", response_class=HTMLResponse)
@@ -239,15 +253,22 @@ def create_admin_api_router() -> APIRouter:
     ) -> dict[str, int | float | dict[str, int]]:
         selector: KeySelector = request.app.state.selector
         history = request.app.state.request_history
+        requests = _build_requests(history)
 
-        status_counter: Counter[int] = Counter(item["status_code"] for item in history)
-        key_counter: Counter[str] = Counter(
-            item["key_id"] for item in history if item["key_id"]
+        status_counter: Counter[int] = Counter(
+            int(item.get("status", 0)) for item in requests if item.get("status")
         )
-        total = len(history)
+        key_counter: Counter[str] = Counter(
+            str(item["key_id"])
+            for item in requests
+            if item.get("key_id") and item.get("key_id") != "-"
+        )
+        total = len(requests)
         avg_latency = 0.0
         if total:
-            avg_latency = sum(float(item["latency"]) for item in history) / total
+            avg_latency = (
+                sum(float(item.get("latency", 0)) for item in requests) / total
+            )
 
         return {
             "available_keys": sum(1 for k in selector.keys if k.is_available()),
@@ -262,7 +283,7 @@ def create_admin_api_router() -> APIRouter:
     async def history(
         request: Request, _: str = Depends(get_current_user)
     ) -> dict[str, list[dict] | int]:
-        history_records = list(request.app.state.request_history)
+        history_records = _history_records_for_json(request.app.state.request_history)
         return {"items": history_records, "total": len(history_records)}
 
     HEARTBEAT_INTERVAL = 30  # seconds
@@ -283,7 +304,6 @@ def create_admin_api_router() -> APIRouter:
 
         config: Config = request.app.state.config
 
-        # Return empty if no logging configured
         if not config.logging.file:
             return {
                 "items": [],
@@ -306,23 +326,21 @@ def create_admin_api_router() -> APIRouter:
                 "has_more": False,
             }
 
-        # Parse time range (convert to naive datetime for comparison)
         start_dt = None
         end_dt = None
         if start:
             try:
                 dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
-                start_dt = dt.replace(tzinfo=None) if dt.tzinfo else dt
+                start_dt = dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
             except ValueError:
                 pass
         if end:
             try:
                 dt = datetime.fromisoformat(end.replace("Z", "+00:00"))
-                end_dt = dt.replace(tzinfo=None) if dt.tzinfo else dt
+                end_dt = dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
             except ValueError:
                 pass
 
-        # Parse levels
         level_set = None
         if levels:
             level_set = set(levels.split(",")) & {
@@ -335,7 +353,6 @@ def create_admin_api_router() -> APIRouter:
             if not level_set:
                 level_set = None
 
-        # Read and filter logs
         entries = read_log_file(log_path)
         filtered, total, has_more = filter_logs(
             entries, start_dt, end_dt, level_set, offset, limit
@@ -356,60 +373,43 @@ def create_admin_api_router() -> APIRouter:
         levels: str = "",
         _: str = Depends(get_current_user),
     ):
-        """SSE endpoint for real-time logs."""
-        import asyncio
-        from pathlib import Path
+        """SSE endpoint for real-time logs via in-memory broadcaster."""
+        broadcaster: LogBroadcaster = request.app.state.log_broadcaster
 
-        config: Config = request.app.state.config
-
-        # Return error if no logging configured
-        if not config.logging.file:
-
-            async def error_generator():
-                yield f"event: error\ndata: {json.dumps({'error': 'Logging not configured'})}\n\n"
-
-            return StreamingResponse(error_generator(), media_type="text/event-stream")
-
-        log_path = Path(config.logging.file)
         level_set = (
             set(levels.split(",")) & {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
             if levels
             else None
         )
 
-        if not log_path.exists():
-
-            async def error_generator():
-                yield f"event: error\ndata: {json.dumps({'error': 'Log file not found'})}\n\n"
-
-            return StreamingResponse(error_generator(), media_type="text/event-stream")
+        queue = broadcaster.subscribe()
 
         async def event_generator():
             try:
-                async with aiofiles.open(log_path, encoding="utf-8") as f:
-                    await f.seek(0, 2)  # Seek to end
-                    last_heartbeat = asyncio.get_event_loop().time()
+                for entry in broadcaster.get_recent(level_set, limit=200):
+                    yield f"event: log\ndata: {json.dumps(entry.to_dict())}\n\n"
 
-                    while True:
-                        # Check client disconnect
-                        if await request.is_disconnected():
-                            break
+                last_heartbeat = asyncio.get_event_loop().time()
 
-                        # Send heartbeat
-                        now = asyncio.get_event_loop().time()
-                        if now - last_heartbeat >= HEARTBEAT_INTERVAL:
-                            yield "event: ping\ndata: {}\n\n"
-                            last_heartbeat = now
+                while True:
+                    if await request.is_disconnected():
+                        break
 
-                        line = await f.readline()
-                        if line:
-                            entry = parse_log_line(line.strip())
-                            if entry and (not level_set or entry.level in level_set):
-                                yield f"event: log\ndata: {json.dumps(entry.to_dict())}\n\n"
-                        else:
-                            await asyncio.sleep(0.1)
+                    try:
+                        entry = await asyncio.wait_for(queue.get(), timeout=5.0)
+                        if not level_set or entry.level in level_set:
+                            yield f"event: log\ndata: {json.dumps(entry.to_dict())}\n\n"
+                    except asyncio.TimeoutError:
+                        pass
+
+                    now = asyncio.get_event_loop().time()
+                    if now - last_heartbeat >= HEARTBEAT_INTERVAL:
+                        yield "event: ping\ndata: {}\n\n"
+                        last_heartbeat = now
             except Exception as e:
                 yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+            finally:
+                broadcaster.unsubscribe(queue)
 
         return StreamingResponse(
             event_generator(),
@@ -446,13 +446,13 @@ def create_admin_api_router() -> APIRouter:
         if start:
             try:
                 dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
-                start_dt = dt.replace(tzinfo=None) if dt.tzinfo else dt
+                start_dt = dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
             except ValueError:
                 pass
         if end:
             try:
                 dt = datetime.fromisoformat(end.replace("Z", "+00:00"))
-                end_dt = dt.replace(tzinfo=None) if dt.tzinfo else dt
+                end_dt = dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
             except ValueError:
                 pass
 

@@ -2,9 +2,10 @@
 
 {% block title %}Dashboard - Ollama Router Admin{% endblock %}
 {% block header_title %}Dashboard{% endblock %}
+{% block header_subtitle %}Overview of key health, request flow, and router activity.{% endblock %}
 
 {% block content %}
-<div id="stats-container" hx-get="/admin/api/stats/panel" hx-trigger="every 30s" hx-swap="innerHTML">
+<div id="stats-container" hx-get="/admin/api/stats/panel" hx-trigger="load, every 30s" hx-swap="innerHTML">
     {% include "admin/_stats_panel.html" %}
 </div>
 {% endblock %}

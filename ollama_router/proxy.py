@@ -8,6 +8,7 @@ logger = logging.getLogger("ollama_router")
 # Claude Code coding tasks can take a very long time (complex refactors, etc.)
 # 1800s = 30 minutes per request to match typical Claude Code usage patterns.
 UPSTREAM_TIMEOUT = 1800.0
+UPSTREAM_LIMITS = httpx.Limits(max_connections=200, max_keepalive_connections=50)
 
 
 class ProxyClient:
@@ -27,14 +28,19 @@ class ProxyClient:
         proxy_url = proxy_https or proxy_http
         if proxy_url:
             logger.info("proxy_configured url=%s", proxy_url)
-            transport = httpx.AsyncHTTPTransport(proxy=proxy_url)
+            transport = httpx.AsyncHTTPTransport(
+                proxy=proxy_url,
+                limits=UPSTREAM_LIMITS,
+            )
             self.client = httpx.AsyncClient(
                 timeout=httpx.Timeout(UPSTREAM_TIMEOUT, connect=30.0),
                 transport=transport,
+                limits=UPSTREAM_LIMITS,
             )
         else:
             self.client = httpx.AsyncClient(
                 timeout=httpx.Timeout(UPSTREAM_TIMEOUT, connect=30.0),
+                limits=UPSTREAM_LIMITS,
             )
 
     async def forward(
@@ -55,6 +61,30 @@ class ProxyClient:
         new_headers = {"Authorization": headers.get("Authorization", "")}
 
         return await self.client.request(
+            method=method,
+            url=url,
+            headers=new_headers,
+            json=json_data,
+        )
+
+    def forward_stream(
+        self,
+        method: str,
+        path: str,
+        headers: dict[str, str],
+        json_data: dict[str, Any] | None = None,
+    ):
+        effective_path = path.lstrip("/")
+        if effective_path.startswith("v1/"):
+            effective_path = effective_path[3:]
+            upstream = self.upstream.rstrip("/v1")
+            url = f"{upstream}/v1/{effective_path}"
+        else:
+            url = f"{self.upstream}/{effective_path}"
+
+        new_headers = {"Authorization": headers.get("Authorization", "")}
+
+        return self.client.stream(
             method=method,
             url=url,
             headers=new_headers,

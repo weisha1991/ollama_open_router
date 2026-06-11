@@ -4,6 +4,7 @@ from enum import Enum
 import json
 from pathlib import Path
 import random
+from threading import Lock
 
 
 class KeyStatus(Enum):
@@ -18,6 +19,7 @@ class KeyState:
     status: KeyStatus = KeyStatus.AVAILABLE
     cooldown_until: datetime | None = None
     reason: str | None = None
+    active_streams: int = 0
 
     def is_available(self) -> bool:
         if self.status == KeyStatus.DISABLED:
@@ -86,24 +88,31 @@ class StateStore:
 
 class KeySelector:
     def __init__(
-        self, keys: list[KeyState], index: int = 0, last_failed_key: str | None = None
+        self,
+        keys: list[KeyState],
+        index: int = 0,
+        last_failed_key: str | None = None,
+        max_concurrent_streams_per_key: int = 2,
     ):
         self.keys = keys
         self.index = index % len(keys) if keys else 0
         self.last_failed_key = last_failed_key
         self.last_used_key: str | None = None
+        self.max_concurrent_streams_per_key = max_concurrent_streams_per_key
+        self._lock = Lock()
 
     def select(self) -> KeyState | None:
-        if not self.keys:
-            return None
+        with self._lock:
+            if not self.keys:
+                return None
 
-        candidates = [k for k in self.keys if k.is_available()]
-        if not candidates:
-            return None
+            candidates = [k for k in self.keys if k.is_available()]
+            if not candidates:
+                return None
 
-        selected = self._smart_pick(candidates)
-        self.index = self.keys.index(selected)
-        return selected
+            selected = self._smart_pick(candidates)
+            self.index = self.keys.index(selected)
+            return selected
 
     def _smart_pick(self, candidates: list[KeyState]) -> KeyState:
         if len(candidates) == 1:
@@ -128,22 +137,57 @@ class KeySelector:
     def mark_cooldown(self, key: str, cooldown_hours: int, reason: str):
         from datetime import timedelta
 
-        for k in self.keys:
-            if k.key == key:
-                k.status = KeyStatus.COOLDOWN
-                k.cooldown_until = datetime.now(timezone.utc) + timedelta(
-                    hours=cooldown_hours
-                )
-                k.reason = reason
-                break
+        with self._lock:
+            for k in self.keys:
+                if k.key == key:
+                    k.status = KeyStatus.COOLDOWN
+                    k.cooldown_until = datetime.now(timezone.utc) + timedelta(
+                        hours=cooldown_hours
+                    )
+                    k.reason = reason
+                    break
 
     def mark_disabled(self, key: str, reason: str):
-        for k in self.keys:
-            if k.key == key:
-                k.status = KeyStatus.DISABLED
-                k.cooldown_until = None
-                k.reason = reason
-                break
+        with self._lock:
+            for k in self.keys:
+                if k.key == key:
+                    k.status = KeyStatus.DISABLED
+                    k.cooldown_until = None
+                    k.reason = reason
+                    break
 
     def update_last_failed_key(self, key: str | None):
-        self.last_failed_key = key
+        with self._lock:
+            self.last_failed_key = key
+
+    def acquire_stream_lease(self) -> KeyState | None:
+        with self._lock:
+            candidates = [
+                k
+                for k in self.keys
+                if k.is_available()
+                and k.active_streams < self.max_concurrent_streams_per_key
+            ]
+            if not candidates:
+                return None
+
+            min_load = min(k.active_streams for k in candidates)
+            lowest_load = [k for k in candidates if k.active_streams == min_load]
+            selected = self._smart_pick(lowest_load)
+            selected.active_streams += 1
+            self.index = self.keys.index(selected)
+            return selected
+
+    def release_stream_lease(self, key: str) -> None:
+        with self._lock:
+            for item in self.keys:
+                if item.key == key:
+                    item.active_streams = max(0, item.active_streams - 1)
+                    break
+
+    def get_active_streams(self, key: str) -> int:
+        with self._lock:
+            for item in self.keys:
+                if item.key == key:
+                    return item.active_streams
+            return 0

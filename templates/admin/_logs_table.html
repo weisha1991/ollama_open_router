@@ -1,80 +1,80 @@
-<div class="space-y-4">
-    <!-- Filters -->
-    <div class="bg-gray-800 rounded-lg p-4 space-y-4">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <!-- Time Range Preset -->
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-2">时间范围</label>
-                <select id="time-preset" onchange="applyPreset()" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="1h">最近1小时</option>
-                    <option value="6h">最近6小时</option>
-                    <option value="24h" selected>最近24小时</option>
-                    <option value="7d">最近7天</option>
-                    <option value="custom">自定义</option>
-                </select>
+<section class="admin-panel rounded-lg overflow-hidden">
+    <div class="border-b border-white/6 px-4 py-3.5">
+        <h3 class="font-display text-xl font-semibold text-white">Historical Logs</h3>
+        <p class="mt-1 text-sm text-slate-400">Filter persisted log entries by time window and severity before previewing or downloading.</p>
+    </div>
+
+    <div class="space-y-4 p-4">
+        <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+            <div class="grid gap-4 lg:grid-cols-3">
+                <div>
+                    <label class="mb-2 block text-sm font-semibold text-slate-300">Time Range</label>
+                    <select id="time-preset" onchange="applyPreset()" class="admin-select">
+                        <option value="1h">Last 1 hour</option>
+                        <option value="6h">Last 6 hours</option>
+                        <option value="24h" selected>Last 24 hours</option>
+                        <option value="7d">Last 7 days</option>
+                        <option value="custom">Custom range</option>
+                    </select>
+                </div>
+                <div id="start-time-container" class="hidden">
+                    <label class="mb-2 block text-sm font-semibold text-slate-300">Start Time</label>
+                    <input type="datetime-local" id="start-time" class="admin-input">
+                </div>
+                <div id="end-time-container" class="hidden">
+                    <label class="mb-2 block text-sm font-semibold text-slate-300">End Time</label>
+                    <input type="datetime-local" id="end-time" class="admin-input">
+                </div>
             </div>
-            <!-- Custom Start Time -->
-            <div id="start-time-container" class="hidden">
-                <label class="block text-sm font-medium text-gray-300 mb-2">开始时间</label>
-                <input type="datetime-local" id="start-time" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-            <!-- Custom End Time -->
-            <div id="end-time-container" class="hidden">
-                <label class="block text-sm font-medium text-gray-300 mb-2">结束时间</label>
-                <input type="datetime-local" id="end-time" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+
+            <div class="flex flex-wrap gap-2">
+                <button onclick="loadLogs()" class="admin-button border-sky-400/25 bg-sky-400/10 text-sky-100">
+                    Query Logs
+                </button>
+                <button onclick="downloadLogs('log')" class="admin-button">
+                    Download .log
+                </button>
+                <button onclick="downloadLogs('json')" class="admin-button">
+                    Download .json
+                </button>
             </div>
         </div>
 
-        <!-- Log Level Filters -->
         <div>
-            <label class="block text-sm font-medium text-gray-300 mb-2">日志级别</label>
-            <div class="flex flex-wrap gap-4">
-                <label class="inline-flex items-center">
-                    <input type="checkbox" value="DEBUG" class="level-filter rounded text-blue-500 focus:ring-blue-500 bg-gray-700 border-gray-600">
-                    <span class="ml-2 text-sm text-gray-300">DEBUG</span>
+            <label class="mb-3 block text-sm font-semibold text-slate-300">Log Levels</label>
+            <div class="flex flex-wrap gap-2">
+                <label class="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/5 px-4 py-2 text-sm text-slate-300">
+                    <input type="checkbox" value="DEBUG" class="level-filter rounded border-white/20 bg-slate-950 text-sky-500">
+                    DEBUG
                 </label>
-                <label class="inline-flex items-center">
-                    <input type="checkbox" value="INFO" class="level-filter rounded text-blue-500 focus:ring-blue-500 bg-gray-700 border-gray-600" checked>
-                    <span class="ml-2 text-sm text-gray-300">INFO</span>
+                <label class="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/5 px-4 py-2 text-sm text-slate-300">
+                    <input type="checkbox" value="INFO" class="level-filter rounded border-white/20 bg-slate-950 text-sky-500" checked>
+                    INFO
                 </label>
-                <label class="inline-flex items-center">
-                    <input type="checkbox" value="WARNING" class="level-filter rounded text-blue-500 focus:ring-blue-500 bg-gray-700 border-gray-600" checked>
-                    <span class="ml-2 text-sm text-gray-300">WARNING</span>
+                <label class="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/5 px-4 py-2 text-sm text-slate-300">
+                    <input type="checkbox" value="WARNING" class="level-filter rounded border-white/20 bg-slate-950 text-sky-500" checked>
+                    WARNING
                 </label>
-                <label class="inline-flex items-center">
-                    <input type="checkbox" value="ERROR" class="level-filter rounded text-blue-500 focus:ring-blue-500 bg-gray-700 border-gray-600" checked>
-                    <span class="ml-2 text-sm text-gray-300">ERROR</span>
+                <label class="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/5 px-4 py-2 text-sm text-slate-300">
+                    <input type="checkbox" value="ERROR" class="level-filter rounded border-white/20 bg-slate-950 text-sky-500" checked>
+                    ERROR
                 </label>
-                <label class="inline-flex items-center">
-                    <input type="checkbox" value="CRITICAL" class="level-filter rounded text-blue-500 focus:ring-blue-500 bg-gray-700 border-gray-600" checked>
-                    <span class="ml-2 text-sm text-gray-300">CRITICAL</span>
+                <label class="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/5 px-4 py-2 text-sm text-slate-300">
+                    <input type="checkbox" value="CRITICAL" class="level-filter rounded border-white/20 bg-slate-950 text-sky-500" checked>
+                    CRITICAL
                 </label>
             </div>
         </div>
 
-        <!-- Action Buttons -->
-        <div class="flex flex-wrap gap-2">
-            <button onclick="loadLogs()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors">
-                查询
-            </button>
-            <button onclick="downloadLogs('log')" class="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white text-sm font-medium rounded-md transition-colors">
-                下载 .log
-            </button>
-            <button onclick="downloadLogs('json')" class="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white text-sm font-medium rounded-md transition-colors">
-                下载 .json
-            </button>
-        </div>
-    </div>
-
-    <!-- Logs Table -->
-    <div class="bg-gray-800 rounded-lg overflow-hidden">
-        <div id="logs-table-container">
-            <div class="p-8 text-center text-gray-400">
-                点击"查询"加载日志...
+        <div class="admin-console-frame overflow-hidden rounded-lg">
+            <div id="logs-table-container">
+                <div class="px-5 py-12 text-center text-sm text-slate-500">
+                    Click Query Logs to load matching entries.
+                </div>
             </div>
         </div>
     </div>
-</div>
+</section>
 
 <script>
 function applyPreset() {
@@ -123,7 +123,7 @@ function loadLogs() {
     if (levels) params.append('levels', levels);
 
     const container = document.getElementById('logs-table-container');
-    container.innerHTML = '<div class="p-8 text-center text-gray-400">加载中...</div>';
+    container.innerHTML = '<div class="px-5 py-12 text-center text-sm text-slate-500">Loading logs...</div>';
 
     fetch(`/admin/api/logs?${params.toString()}`)
         .then(response => response.json())
@@ -131,7 +131,7 @@ function loadLogs() {
             renderLogsTable(data);
         })
         .catch(err => {
-            container.innerHTML = '<div class="p-8 text-center text-red-400">加载失败: ' + escapeHtml(err.message) + '</div>';
+            container.innerHTML = '<div class="px-5 py-12 text-center text-sm text-red-300">Failed to load logs: ' + escapeHtml(err.message) + '</div>';
         });
 }
 
@@ -139,42 +139,42 @@ function renderLogsTable(data) {
     const container = document.getElementById('logs-table-container');
 
     if (!data.items || data.items.length === 0) {
-        container.innerHTML = '<div class="p-8 text-center text-gray-400">没有找到匹配的日志记录</div>';
+        container.innerHTML = '<div class="px-5 py-12 text-center text-sm text-slate-500">No matching log entries found.</div>';
         return;
     }
 
     let html = `
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-700">
-                <thead class="bg-gray-700">
+            <table class="admin-table admin-table-dense">
+                <thead>
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">时间</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">级别</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">请求ID</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">消息</th>
+                        <th>Time</th>
+                        <th>Level</th>
+                        <th>Request ID</th>
+                        <th>Message</th>
                     </tr>
                 </thead>
-                <tbody class="bg-gray-800 divide-y divide-gray-700">
+                <tbody>
     `;
 
     data.items.forEach(item => {
         const levelClass = {
-            'DEBUG': 'bg-gray-600 text-gray-300',
-            'INFO': 'bg-blue-600 text-white',
-            'WARNING': 'bg-yellow-600 text-white',
-            'ERROR': 'bg-red-600 text-white',
-            'CRITICAL': 'bg-red-700 text-white font-bold'
-        }[item.level] || 'bg-gray-600 text-gray-300';
+            'DEBUG': 'admin-badge-neutral',
+            'INFO': 'admin-badge-neutral',
+            'WARNING': 'admin-badge-warning',
+            'ERROR': 'admin-badge-danger',
+            'CRITICAL': 'admin-badge-danger'
+        }[item.level] || 'admin-badge-neutral';
 
-        const time = item.timestamp.substring(0, 19);
+        const time = new Date(item.timestamp).toLocaleString(undefined, { hour12: false });
         html += `
-            <tr class="hover:bg-gray-700">
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-300">${time}</td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm">
-                    <span class="px-2 py-1 text-xs rounded ${levelClass}">${item.level}</span>
+            <tr>
+                <td class="whitespace-nowrap text-slate-300">${time}</td>
+                <td class="whitespace-nowrap">
+                    <span class="admin-badge ${levelClass}">${item.level}</span>
                 </td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-400 font-mono">${item.request_id}</td>
-                <td class="px-4 py-3 text-sm text-gray-300">${escapeHtml(item.message)}</td>
+                <td class="whitespace-nowrap font-mono text-sm text-slate-400">${escapeHtml(item.request_id)}</td>
+                <td class="text-slate-300">${escapeHtml(item.message)}</td>
             </tr>
         `;
     });
@@ -183,9 +183,9 @@ function renderLogsTable(data) {
                 </tbody>
             </table>
         </div>
-        <div class="px-4 py-3 bg-gray-700 text-sm text-gray-300">
-            显示 ${data.filtered} 条记录，共 ${data.total} 条
-            ${data.has_more ? '<span class="text-gray-400">(还有更多记录)</span>' : ''}
+        <div class="border-t border-white/6 px-5 py-4 text-sm text-slate-400">
+            Showing ${data.filtered} entries from ${data.total}
+            ${data.has_more ? '<span class="text-slate-500">with more available</span>' : ''}
         </div>
     `;
 

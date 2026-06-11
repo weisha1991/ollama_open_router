@@ -1,57 +1,70 @@
-<div class="space-y-4">
-    <!-- Filters -->
-    <div class="bg-gray-800 rounded-lg p-4 space-y-4">
-        <!-- Log Level Filters -->
-        <div>
-            <label class="block text-sm font-medium text-gray-300 mb-2">日志级别</label>
-            <div class="flex flex-wrap gap-4">
-                <label class="inline-flex items-center">
-                    <input type="checkbox" value="DEBUG" class="stream-level-filter rounded text-blue-500 focus:ring-blue-500 bg-gray-700 border-gray-600">
-                    <span class="ml-2 text-sm text-gray-300">DEBUG</span>
-                </label>
-                <label class="inline-flex items-center">
-                    <input type="checkbox" value="INFO" class="stream-level-filter rounded text-blue-500 focus:ring-blue-500 bg-gray-700 border-gray-600" checked>
-                    <span class="ml-2 text-sm text-gray-300">INFO</span>
-                </label>
-                <label class="inline-flex items-center">
-                    <input type="checkbox" value="WARNING" class="stream-level-filter rounded text-blue-500 focus:ring-blue-500 bg-gray-700 border-gray-600" checked>
-                    <span class="ml-2 text-sm text-gray-300">WARNING</span>
-                </label>
-                <label class="inline-flex items-center">
-                    <input type="checkbox" value="ERROR" class="stream-level-filter rounded text-blue-500 focus:ring-blue-500 bg-gray-700 border-gray-600" checked>
-                    <span class="ml-2 text-sm text-gray-300">ERROR</span>
-                </label>
-                <label class="inline-flex items-center">
-                    <input type="checkbox" value="CRITICAL" class="stream-level-filter rounded text-blue-500 focus:ring-blue-500 bg-gray-700 border-gray-600" checked>
-                    <span class="ml-2 text-sm text-gray-300">CRITICAL</span>
-                </label>
+<section class="admin-panel rounded-lg overflow-hidden">
+    <div class="border-b border-white/6 px-4 py-3.5">
+        <h3 class="font-display text-xl font-semibold text-white">Realtime Logs</h3>
+        <p class="mt-1 text-sm text-slate-400">Open a live stream to observe incoming router events as they happen.</p>
+    </div>
+
+    <div class="space-y-4 p-4">
+        <div class="admin-panel-soft rounded-lg p-4">
+            <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+                <div>
+                    <label class="mb-3 block text-sm font-semibold text-slate-300">Stream Levels</label>
+                    <div class="flex flex-wrap gap-2">
+                        <label class="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/5 px-4 py-2 text-sm text-slate-300">
+                            <input type="checkbox" value="DEBUG" class="stream-level-filter rounded border-white/20 bg-slate-950 text-sky-500">
+                            DEBUG
+                        </label>
+                        <label class="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/5 px-4 py-2 text-sm text-slate-300">
+                            <input type="checkbox" value="INFO" class="stream-level-filter rounded border-white/20 bg-slate-950 text-sky-500" checked>
+                            INFO
+                        </label>
+                        <label class="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/5 px-4 py-2 text-sm text-slate-300">
+                            <input type="checkbox" value="WARNING" class="stream-level-filter rounded border-white/20 bg-slate-950 text-sky-500" checked>
+                            WARNING
+                        </label>
+                        <label class="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/5 px-4 py-2 text-sm text-slate-300">
+                            <input type="checkbox" value="ERROR" class="stream-level-filter rounded border-white/20 bg-slate-950 text-sky-500" checked>
+                            ERROR
+                        </label>
+                        <label class="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/5 px-4 py-2 text-sm text-slate-300">
+                            <input type="checkbox" value="CRITICAL" class="stream-level-filter rounded border-white/20 bg-slate-950 text-sky-500" checked>
+                            CRITICAL
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <label class="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/5 px-4 py-2 text-sm text-slate-300">
+                        <input type="checkbox" id="auto-scroll" class="rounded border-white/20 bg-slate-950 text-sky-500" checked>
+                        Auto-scroll
+                    </label>
+                    <button id="pause-btn" onclick="togglePause()" class="admin-button border-amber-400/20 text-amber-200">
+                        Pause
+                    </button>
+                    <button onclick="clearLogs()" class="admin-button border-rose-400/20 text-rose-200">
+                        Clear
+                    </button>
+                </div>
             </div>
         </div>
 
-        <!-- Control Buttons -->
-        <div class="flex flex-wrap gap-2 items-center">
-            <label class="inline-flex items-center">
-                <input type="checkbox" id="auto-scroll" class="rounded text-blue-500 focus:ring-blue-500 bg-gray-700 border-gray-600" checked>
-                <span class="ml-2 text-sm text-gray-300">自动滚动</span>
-            </label>
-            <button id="pause-btn" onclick="togglePause()" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-medium rounded-md transition-colors">
-                暂停
-            </button>
-            <button onclick="clearLogs()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-md transition-colors">
-                清空
-            </button>
-        </div>
-    </div>
-
-    <!-- Log Stream Container -->
-    <div class="bg-gray-800 rounded-lg overflow-hidden">
-        <div id="log-stream-container" class="h-96 overflow-y-auto font-mono text-sm p-4 space-y-1">
-            <div class="text-gray-400 text-center py-8">
-                点击"实时日志"标签开始查看实时日志...
+        <div class="admin-console-frame overflow-hidden rounded-lg bg-[#050914] shadow-inner shadow-black/40">
+            <div class="flex items-center justify-between border-b border-white/6 bg-white/[0.03] px-5 py-3">
+                <div class="flex items-center gap-2">
+                    <span class="h-3 w-3 rounded-full bg-rose-400"></span>
+                    <span class="h-3 w-3 rounded-full bg-amber-400"></span>
+                    <span class="h-3 w-3 rounded-full bg-emerald-400"></span>
+                </div>
+                <p class="font-mono text-xs text-slate-500">/admin/api/logs/stream</p>
+            </div>
+            <div id="log-stream-container" class="h-[30rem] overflow-y-auto p-4 font-mono text-sm leading-6">
+                <div class="py-12 text-center text-sm text-slate-500">
+                    Click Realtime Logs to open the stream. Recent entries will appear here.
+                </div>
             </div>
         </div>
     </div>
-</div>
+</section>
 
 <script>
 let eventSource = null;
@@ -73,7 +86,7 @@ function startLogStream() {
     eventSource = new EventSource(`/admin/api/logs/stream${params}`);
 
     const container = document.getElementById('log-stream-container');
-    container.innerHTML = '<div class="text-gray-400 text-center py-8">等待日志...</div>';
+    container.innerHTML = '<div class="py-12 text-center text-sm text-slate-500">Waiting for logs...</div>';
 
     eventSource.addEventListener('log', function(e) {
         if (isPaused) return;
@@ -85,8 +98,8 @@ function startLogStream() {
         }
     });
 
-    eventSource.addEventListener('ping', function(e) {
-        // Heartbeat received, connection still alive
+    eventSource.addEventListener('ping', function() {
+        // Heartbeat received.
     });
 
     eventSource.addEventListener('error', function(e) {
@@ -100,7 +113,9 @@ function startLogStream() {
                     request_id: 'system',
                     message: `Stream error: ${error.error}`
                 });
-            } catch (err) {}
+            } catch (err) {
+                // Ignore malformed error payloads from the stream.
+            }
         }
     });
 
@@ -111,7 +126,7 @@ function startLogStream() {
                 timestamp: new Date().toISOString(),
                 level: 'ERROR',
                 request_id: 'system',
-                message: 'Connection closed. Click "实时日志" to reconnect.'
+                message: 'Connection closed. Select Realtime Logs to reconnect.'
             });
         }
     };
@@ -126,40 +141,36 @@ function stopLogStream() {
 
 function addLogEntry(log) {
     const container = document.getElementById('log-stream-container');
-
-    // Remove placeholder if present
     const placeholder = container.querySelector('.text-center');
-    if (placeholder && placeholder.textContent.includes('等待') || placeholder.textContent.includes('点击')) {
+    if (placeholder && (placeholder.textContent.includes('Waiting') || placeholder.textContent.includes('Click'))) {
         placeholder.remove();
     }
 
     const entry = document.createElement('div');
-    entry.className = 'flex gap-2';
+    entry.className = 'grid gap-3 border-b border-white/5 py-2 text-slate-300 md:grid-cols-[86px_82px_136px_minmax(0,1fr)]';
 
     const levelColors = {
-        'DEBUG': 'text-gray-400',
-        'INFO': 'text-blue-400',
-        'WARNING': 'text-yellow-400',
-        'ERROR': 'text-red-400',
-        'CRITICAL': 'text-red-500 font-bold'
+        'DEBUG': 'text-slate-500',
+        'INFO': 'text-sky-300',
+        'WARNING': 'text-amber-300',
+        'ERROR': 'text-rose-300',
+        'CRITICAL': 'text-rose-200 font-bold'
     };
 
-    const time = new Date(log.timestamp).toLocaleTimeString();
+    const time = new Date(log.timestamp).toLocaleTimeString(undefined, { hour12: false });
     entry.innerHTML = `
-        <span class="text-gray-500 w-20 flex-shrink-0">${time}</span>
-        <span class="${levelColors[log.level] || 'text-gray-300'} w-20 flex-shrink-0">${log.level}</span>
-        <span class="text-gray-500 w-28 flex-shrink-0">[${log.request_id}]</span>
-        <span class="text-gray-300 flex-1">${escapeHtml(log.message)}</span>
+        <span class="text-slate-600">${time}</span>
+        <span class="${levelColors[log.level] || 'text-slate-300'}">${log.level}</span>
+        <span class="truncate text-slate-600">[${escapeHtml(log.request_id)}]</span>
+        <span class="min-w-0 break-words text-slate-300">${escapeHtml(log.message)}</span>
     `;
 
     container.appendChild(entry);
 
-    // Limit log entries
     while (container.children.length > maxLogs) {
         container.removeChild(container.firstChild);
     }
 
-    // Auto-scroll
     if (document.getElementById('auto-scroll').checked) {
         container.scrollTop = container.scrollHeight;
     }
@@ -174,26 +185,24 @@ function escapeHtml(text) {
 function togglePause() {
     isPaused = !isPaused;
     const btn = document.getElementById('pause-btn');
-    btn.textContent = isPaused ? '继续' : '暂停';
+    btn.textContent = isPaused ? 'Resume' : 'Pause';
     btn.className = isPaused
-        ? 'px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md transition-colors'
-        : 'px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-medium rounded-md transition-colors';
+        ? 'admin-button border-emerald-400/20 text-emerald-200'
+        : 'admin-button border-amber-400/20 text-amber-200';
 }
 
 function clearLogs() {
     const container = document.getElementById('log-stream-container');
     container.innerHTML = `
-        <div class="text-gray-400 text-center py-8">
-            日志已清空
+        <div class="py-12 text-center text-sm text-slate-500">
+            Log stream cleared.
         </div>
     `;
 }
 
-// Update stream when level filters change
 document.querySelectorAll('.stream-level-filter').forEach(cb => {
     cb.addEventListener('change', function() {
         if (document.getElementById('content-realtime').classList.contains('hidden') === false) {
-            // Restart stream with new filters
             startLogStream();
         }
     });

@@ -2,13 +2,14 @@
 
 import json
 import logging
+import time
 from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -33,33 +34,37 @@ from ollama_router.state import KeySelector, KeyState, StateStore
 logger = logging.getLogger("ollama_router")
 
 
-def setup_logging(config: Config) -> None:
-    """Configure logging with file rotation and request ID filter."""
+def setup_logging(config: Config) -> "LogBroadcaster":
+    """Configure logging with file rotation and request ID filter.
+
+    Returns the LogBroadcaster handler so it can be stored on app.state
+    for use by the SSE log stream endpoint.
+    """
+    from ollama_router.admin.logs import LogBroadcaster
+
     log_config = config.logging
 
-    # Root logger setup
     logger = logging.getLogger("ollama_router")
     logger.setLevel(getattr(logging, log_config.level.upper(), logging.INFO))
 
-    # Clear existing handlers
     logger.handlers.clear()
 
-    # Format with request ID
     formatter = logging.Formatter(
         "%(asctime)s.%(msecs)03d %(levelname)-8s [%(request_id)s] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    # Request ID filter
     request_id_filter = RequestIdFilter()
 
-    # Console handler
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
     console_handler.addFilter(request_id_filter)
     logger.addHandler(console_handler)
 
-    # File handler (if configured)
+    broadcaster = LogBroadcaster(capacity=1000)
+    broadcaster.addFilter(request_id_filter)
+    logger.addHandler(broadcaster)
+
     if log_config.file:
         try:
             log_path = Path(log_config.file)
@@ -76,6 +81,8 @@ def setup_logging(config: Config) -> None:
             logger.addHandler(file_handler)
         except Exception as e:
             logger.warning("Failed to setup file logging: %s", e)
+
+    return broadcaster
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
@@ -110,20 +117,25 @@ _HOP_BY_HOP_HEADERS = frozenset(
 )
 
 
-def _safe_response_headers(response: httpx.Response) -> dict[str, str]:
-    """Extract headers from upstream response, stripping hop-by-hop headers."""
+def _safe_header_mapping(headers: dict[str, str]) -> dict[str, str]:
+    """Strip hop-by-hop headers from a header mapping."""
     return {
         k: v
-        for k, v in response.headers.items()
+        for k, v in headers.items()
         if k.lower() not in _HOP_BY_HOP_HEADERS
     }
+
+
+def _safe_response_headers(response: httpx.Response) -> dict[str, str]:
+    """Extract headers from upstream response, stripping hop-by-hop headers."""
+    return _safe_header_mapping(dict(response.headers))
 
 
 def create_app(config: Config, state_dir: str = "state") -> FastAPI:
     app = FastAPI()
 
     # Setup logging and request ID middleware
-    setup_logging(config)
+    log_broadcaster = setup_logging(config)
     app.add_middleware(RequestIdMiddleware)
 
     state_store = StateStore(state_dir=state_dir)
@@ -166,6 +178,7 @@ def create_app(config: Config, state_dir: str = "state") -> FastAPI:
     app.state.retry_manager = retry_manager
     app.state.templates = Jinja2Templates(directory="templates")
     app.state.proxy = proxy
+    app.state.log_broadcaster = log_broadcaster
 
     app.include_router(create_admin_api_router())
     app.include_router(create_admin_views_router())
@@ -219,6 +232,80 @@ def create_app(config: Config, state_dir: str = "state") -> FastAPI:
         body = None
         if request.method in ("POST", "PUT", "PATCH"):
             body = await request.json()
+
+        if isinstance(body, dict) and body.get("stream") is True:
+            stream_start_ts = time.perf_counter()
+            stream_result = await retry_manager.prepare_stream_with_retry(
+                method=request.method,
+                path=f"/{path}",
+                headers=dict(request.headers),
+                body=body,
+                proxy=proxy,
+                request_id=get_request_id(),
+            )
+
+            if not stream_result.success:
+                if stream_result.last_error == "No available API keys":
+                    return JSONResponse(
+                        status_code=503,
+                        content={
+                            "error": "No available API keys. All keys are in cooldown."
+                        },
+                    )
+                if stream_result.last_error and "timeout" in stream_result.last_error.lower():
+                    return JSONResponse(
+                        status_code=504,
+                        content={"error": "Upstream server timeout."},
+                    )
+                if stream_result.error_status_code is not None:
+                    return Response(
+                        content=stream_result.error_body or b"",
+                        status_code=stream_result.error_status_code,
+                        headers=_safe_header_mapping(stream_result.error_headers or {}),
+                    )
+                return JSONResponse(
+                    status_code=502,
+                    content={"error": stream_result.last_error or "Proxy error"},
+                )
+
+            assert stream_result.response is not None
+            assert stream_result.stream_context is not None
+            assert stream_result.selected_key is not None
+            stream_headers = _safe_response_headers(stream_result.response)
+            media_type = stream_headers.pop("content-type", None)
+            if media_type and media_type.startswith("text/event-stream"):
+                stream_headers.setdefault("Cache-Control", "no-cache")
+                stream_headers.setdefault("X-Accel-Buffering", "no")
+
+            async def stream_generator():
+                try:
+                    if stream_result.first_chunk is not None:
+                        yield stream_result.first_chunk
+                    async for chunk in stream_result.chunk_iterator:
+                        yield chunk
+                finally:
+                    latency = round((time.perf_counter() - stream_start_ts) * 1000, 2)
+                    try:
+                        await stream_result.stream_context.__aexit__(None, None, None)
+                    finally:
+                        retry_manager.selector.release_stream_lease(
+                            stream_result.selected_key.key
+                        )
+                        retry_manager.record_stream_completion(
+                            request_id=get_request_id(),
+                            method=request.method,
+                            path=f"/{path}",
+                            status_code=stream_result.response.status_code,
+                            key_id=get_key_id(stream_result.selected_key.key),
+                            latency=latency,
+                        )
+
+            return StreamingResponse(
+                stream_generator(),
+                status_code=stream_result.response.status_code,
+                headers=stream_headers,
+                media_type=media_type,
+            )
 
         result = await retry_manager.execute_with_retry(
             method=request.method,

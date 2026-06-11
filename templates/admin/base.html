@@ -4,94 +4,515 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Ollama Router Admin{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
     <script>
         tailwind.config = {
-            darkMode: 'class',
+            darkMode: "class",
             theme: {
                 extend: {
+                    fontFamily: {
+                        sans: ["Manrope", "ui-sans-serif", "system-ui", "sans-serif"],
+                        display: ["Outfit", "Manrope", "ui-sans-serif", "system-ui", "sans-serif"],
+                    },
                     colors: {
-                        gray: {
-                            850: '#1f2937',
-                            900: '#111827',
-                        }
-                    }
-                }
-            }
+                        admin: {
+                            bg: "#0a1322",
+                            panel: "#101b2d",
+                            panelSoft: "#142136",
+                            line: "#253550",
+                            text: "#e7edf8",
+                            muted: "#95a4bf",
+                            blue: "#5fa8ff",
+                            green: "#38c172",
+                            amber: "#f2b44f",
+                            red: "#ee6b73",
+                        },
+                    },
+                },
+            },
         }
     </script>
     <style>
-        body { background-color: #111827; color: #f3f4f6; }
-        .htmx-indicator { display: none; }
-        .htmx-request .htmx-indicator { display: inline-block; }
-        .htmx-request.htmx-indicator { display: inline-block; }
+        :root {
+            --admin-bg: #0a1322;
+            --admin-bg-deep: #07101c;
+            --admin-panel: rgba(16, 27, 45, 0.94);
+            --admin-panel-soft: rgba(20, 33, 54, 0.82);
+            --admin-line: rgba(151, 168, 197, 0.16);
+            --admin-line-strong: rgba(95, 168, 255, 0.32);
+            --admin-text: #e7edf8;
+            --admin-muted: #95a4bf;
+            --admin-blue: #5fa8ff;
+            --admin-green: #38c172;
+            --admin-amber: #f2b44f;
+            --admin-red: #ee6b73;
+        }
+
+        html, body {
+            min-height: 100%;
+        }
+
+        body {
+            margin: 0;
+            color: var(--admin-text);
+            font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+            background:
+                linear-gradient(180deg, rgba(95, 168, 255, 0.08), transparent 220px),
+                linear-gradient(180deg, #0d1626 0%, #091220 48%, #07101c 100%);
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0.2;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 24px 24px;
+            mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.65), transparent 92%);
+        }
+
+        .htmx-indicator {
+            display: none;
+        }
+
+        .htmx-request .htmx-indicator,
+        .htmx-request.htmx-indicator {
+            display: inline-flex;
+        }
+
+        .admin-shell {
+            min-height: 100vh;
+            background:
+                linear-gradient(180deg, rgba(7, 13, 24, 0.2), rgba(7, 13, 24, 0.84));
+        }
+
+        .admin-panel {
+            border: 1px solid var(--admin-line);
+            background: linear-gradient(180deg, rgba(17, 28, 47, 0.96), rgba(12, 21, 36, 0.96));
+            box-shadow: 0 18px 36px rgba(3, 8, 18, 0.22);
+        }
+
+        .admin-panel-soft {
+            border: 1px solid rgba(151, 168, 197, 0.12);
+            background: var(--admin-panel-soft);
+        }
+
+        .admin-panel-dense {
+            padding: 1rem;
+        }
+
+        .admin-content-dense {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .admin-page-intro-compact {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .admin-page-header-compact {
+            border-bottom-color: rgba(151, 168, 197, 0.12);
+        }
+
+        .admin-dashboard-primary {
+            border-color: rgba(95, 168, 255, 0.2);
+            box-shadow:
+                0 22px 42px rgba(3, 8, 18, 0.24),
+                inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        }
+
+        .admin-kpi-secondary {
+            background: linear-gradient(180deg, rgba(18, 29, 48, 0.94), rgba(13, 22, 37, 0.94));
+        }
+
+        .admin-kicker {
+            letter-spacing: 0;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: rgba(135, 155, 188, 0.92);
+        }
+
+        .admin-status-dot {
+            width: 0.55rem;
+            height: 0.55rem;
+            border-radius: 9999px;
+            display: inline-block;
+        }
+
+        .admin-nav-link {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            border-radius: 0.625rem;
+            border: 1px solid transparent;
+            padding: 0.75rem 0.9rem;
+            color: var(--admin-muted);
+            transition: 160ms ease;
+        }
+
+        .admin-nav-link:hover {
+            color: var(--admin-text);
+            background: rgba(255, 255, 255, 0.03);
+            border-color: rgba(151, 168, 197, 0.08);
+        }
+
+        .admin-nav-link.active {
+            color: #f6fbff;
+            background: rgba(95, 168, 255, 0.12);
+            border-color: rgba(95, 168, 255, 0.24);
+            box-shadow: inset 3px 0 0 var(--admin-blue);
+        }
+
+        .admin-nav-link svg {
+            width: 1rem;
+            height: 1rem;
+            flex: none;
+        }
+
+        .admin-page-title {
+            font-family: "Outfit", "Manrope", ui-sans-serif, system-ui, sans-serif;
+        }
+
+        .admin-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            border-radius: 0.625rem;
+            border: 1px solid rgba(151, 168, 197, 0.18);
+            padding: 0.75rem 0.95rem;
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--admin-text);
+            font-size: 0.875rem;
+            font-weight: 600;
+            transition: 160ms ease;
+        }
+
+        .admin-button:hover {
+            border-color: rgba(95, 168, 255, 0.34);
+            background: rgba(95, 168, 255, 0.08);
+        }
+
+        .admin-toolbar-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            border-radius: 9999px;
+            border: 1px solid rgba(151, 168, 197, 0.16);
+            background: rgba(255, 255, 255, 0.04);
+            padding: 0.45rem 0.8rem;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #c8d4e9;
+        }
+
+        .admin-table {
+            width: 100%;
+            min-width: 100%;
+            border-collapse: collapse;
+        }
+
+        .admin-table thead th {
+            padding: 0.8rem 1rem;
+            text-align: left;
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: rgba(165, 181, 210, 0.9);
+            background: rgba(11, 18, 30, 0.92);
+            text-transform: uppercase;
+        }
+
+        .admin-table tbody td {
+            padding: 0.9rem 1rem;
+            border-top: 1px solid rgba(151, 168, 197, 0.08);
+            color: #dbe5f7;
+            font-size: 0.9rem;
+        }
+
+        .admin-table tbody tr:hover {
+            background: rgba(255, 255, 255, 0.025);
+        }
+
+        .admin-table-dense thead th {
+            padding: 0.72rem 0.9rem;
+            letter-spacing: 0.04em;
+        }
+
+        .admin-table-dense tbody td {
+            padding: 0.78rem 0.9rem;
+        }
+
+        .admin-console-frame {
+            border: 1px solid rgba(151, 168, 197, 0.14);
+            background: rgba(6, 11, 20, 0.8);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+        }
+
+        .admin-tab-strip {
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        }
+
+        .admin-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            border-radius: 9999px;
+            padding: 0.28rem 0.65rem;
+            font-size: 0.72rem;
+            font-weight: 700;
+        }
+
+        .admin-badge-success {
+            color: #8ff0b8;
+            background: rgba(28, 81, 54, 0.36);
+            border: 1px solid rgba(56, 193, 114, 0.28);
+        }
+
+        .admin-badge-warning {
+            color: #ffd691;
+            background: rgba(99, 69, 15, 0.34);
+            border: 1px solid rgba(242, 180, 79, 0.26);
+        }
+
+        .admin-badge-danger {
+            color: #ffb4b9;
+            background: rgba(96, 34, 42, 0.36);
+            border: 1px solid rgba(238, 107, 115, 0.26);
+        }
+
+        .admin-badge-neutral {
+            color: #d5def0;
+            background: rgba(29, 45, 70, 0.48);
+            border: 1px solid rgba(151, 168, 197, 0.22);
+        }
+
+        .admin-input,
+        .admin-select {
+            width: 100%;
+            border-radius: 0.625rem;
+            border: 1px solid rgba(151, 168, 197, 0.16);
+            background: rgba(7, 12, 24, 0.86);
+            color: var(--admin-text);
+            padding: 0.75rem 0.9rem;
+            outline: none;
+            transition: 160ms ease;
+        }
+
+        .admin-input::placeholder {
+            color: rgba(145, 160, 187, 0.72);
+        }
+
+        .admin-input:focus,
+        .admin-select:focus {
+            border-color: rgba(95, 168, 255, 0.45);
+            box-shadow: 0 0 0 3px rgba(95, 168, 255, 0.12);
+        }
+
+        @media (min-width: 1280px) {
+            .admin-page-header-compact .admin-page-title {
+                font-size: 1.75rem;
+            }
+        }
     </style>
     <meta name="htmx-config" content='{"defaultSwapStyle":"innerHTML"}'>
     <script>
-        document.addEventListener('htmx:responseError', function(evt) {
+        function closeAdminSidebar() {
+            var sidebar = document.getElementById("sidebar");
+            var backdrop = document.getElementById("sidebar-backdrop");
+            sidebar.classList.add("hidden");
+            sidebar.classList.remove("fixed", "inset-y-0", "left-0", "z-30", "flex");
+            backdrop.classList.add("hidden");
+        }
+
+        function openAdminSidebar() {
+            var sidebar = document.getElementById("sidebar");
+            var backdrop = document.getElementById("sidebar-backdrop");
+            sidebar.classList.remove("hidden");
+            sidebar.classList.add("fixed", "inset-y-0", "left-0", "z-30", "flex");
+            backdrop.classList.remove("hidden");
+        }
+
+        function toggleAdminSidebar() {
+            var sidebar = document.getElementById("sidebar");
+            if (window.innerWidth >= 768) {
+                return;
+            }
+            if (sidebar.classList.contains("hidden")) {
+                openAdminSidebar();
+            } else {
+                closeAdminSidebar();
+            }
+        }
+
+        function resetAdminSidebarForViewport() {
+            var sidebar = document.getElementById("sidebar");
+            var backdrop = document.getElementById("sidebar-backdrop");
+            if (window.innerWidth >= 768) {
+                sidebar.classList.remove("hidden", "fixed", "inset-y-0", "left-0", "z-30");
+                backdrop.classList.add("hidden");
+            } else if (!sidebar.classList.contains("fixed")) {
+                sidebar.classList.add("hidden");
+            }
+        }
+
+        async function logoutAdmin() {
+            var response = await fetch("/admin/api/logout", {
+                method: "POST",
+                credentials: "same-origin",
+                headers: {
+                    "HX-Request": "true"
+                }
+            });
+
+            if (!response.ok) {
+                alert("Logout failed");
+                return;
+            }
+
+            window.location.href = "/admin/login";
+        }
+
+        document.addEventListener("htmx:responseError", function(evt) {
             try {
                 var detail = JSON.parse(evt.detail.xhr.response);
-                alert(detail.detail || 'Request failed');
-            } catch(e) {
-                alert('Request failed (' + evt.detail.xhr.status + ')');
+                alert(detail.detail || "Request failed");
+            } catch (e) {
+                alert("Request failed (" + evt.detail.xhr.status + ")");
             }
         });
-        document.addEventListener('htmx:afterRequest', function(evt) {
-            if (evt.detail.successful && evt.detail.xhr.getResponseHeader('HX-Redirect')) {
+
+        document.addEventListener("htmx:afterRequest", function(evt) {
+            if (evt.detail.successful && evt.detail.xhr.getResponseHeader("HX-Redirect")) {
                 var form = evt.detail.elt;
-                if (form && form.tagName === 'FORM') form.reset();
+                if (form && form.tagName === "FORM") {
+                    form.reset();
+                }
             }
         });
+
+        window.addEventListener("resize", resetAdminSidebarForViewport);
+        document.addEventListener("DOMContentLoaded", resetAdminSidebarForViewport);
     </script>
 </head>
-<body class="bg-gray-900 text-gray-100 h-screen flex overflow-hidden">
-    <aside class="w-64 bg-gray-800 border-r border-gray-700 flex-col hidden md:flex z-10 transition-transform duration-300 ease-in-out" id="sidebar">
-        <div class="h-16 flex items-center px-6 border-b border-gray-700">
-            <span class="text-xl font-bold text-white tracking-wide">Ollama Router</span>
+<body class="admin-shell text-admin-text">
+    <div class="flex min-h-screen">
+        <aside class="hidden w-[248px] shrink-0 flex-col border-r border-white/6 bg-[rgba(8,15,27,0.94)] md:flex" id="sidebar">
+            <div class="flex h-16 items-center gap-3 border-b border-white/6 px-5">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg border border-sky-400/20 bg-sky-400/10 text-sky-200">
+                    <svg fill="none" viewBox="0 0 24 24" class="h-5 w-5">
+                        <path d="M12 3 7 8v8l5 5 5-5V8l-5-5Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"></path>
+                        <path d="M10 9h4m-4 3h4m-4 3h2" stroke="currentColor" stroke-linecap="round" stroke-width="1.7"></path>
+                    </svg>
+                </div>
+                <div class="min-w-0">
+                    <p class="font-display text-lg font-semibold leading-none text-white">Ollama Router</p>
+                    <p class="mt-1 text-xs text-slate-500">Admin Console</p>
+                </div>
+            </div>
+
+            <nav class="flex-1 space-y-1 px-3 py-4">
+                <a href="/admin/dashboard" class="admin-nav-link {% if request and request.url.path == '/admin/dashboard' %}active{% endif %}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M4 13h6V5H4v8Zm10 6h6V5h-6v14ZM4 19h6v-2H4v2Zm0-4h6v-2H4v2Z"></path>
+                    </svg>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/admin/keys" class="admin-nav-link {% if request and request.url.path == '/admin/keys' %}active{% endif %}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M14 7a4 4 0 1 1 2.31 3.627L14 13H9v2H7v2H4v-3.17l5.05-5.05A4 4 0 0 1 14 7Z"></path>
+                    </svg>
+                    <span>Keys</span>
+                </a>
+                <a href="/admin/history" class="admin-nav-link {% if request and request.url.path == '/admin/history' %}active{% endif %}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 6v6l4 2m4-2a8 8 0 1 1-3.15-6.35M20 4v4h-4"></path>
+                    </svg>
+                    <span>History</span>
+                </a>
+                <a href="/admin/logs" class="admin-nav-link {% if request and request.url.path == '/admin/logs' %}active{% endif %}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M8 7h8m-8 5h8m-8 5h5M7 3h7l4 4v14H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"></path>
+                    </svg>
+                    <span>Logs</span>
+                </a>
+            </nav>
+
+            <div class="border-t border-white/6 p-4">
+                <div class="admin-panel-soft rounded-lg p-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <p class="text-xs font-semibold uppercase text-slate-500">Router Health</p>
+                            <p class="mt-1 text-sm font-semibold text-slate-100">Operational</p>
+                        </div>
+                        <span class="inline-flex items-center gap-2 text-xs font-semibold text-emerald-300">
+                            <span class="admin-status-dot bg-emerald-400"></span>
+                            Healthy
+                        </span>
+                    </div>
+                    <dl class="mt-4 grid grid-cols-2 gap-3 text-xs text-slate-400">
+                        <div>
+                            <dt>Refresh</dt>
+                            <dd class="mt-1 text-sm font-semibold text-slate-200">30s</dd>
+                        </div>
+                        <div>
+                            <dt>Version</dt>
+                            <dd class="mt-1 text-sm font-semibold text-slate-200">v0.1.0</dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+        </aside>
+
+        <div class="fixed inset-0 z-20 hidden bg-black/60 md:hidden" id="sidebar-backdrop" onclick="closeAdminSidebar()"></div>
+
+        <div class="flex min-w-0 flex-1 flex-col">
+            <header class="admin-page-header-compact border-b border-white/6 bg-[rgba(8,15,27,0.72)] backdrop-blur-lg">
+                <div class="mx-auto flex max-w-[1600px] flex-col gap-3 px-4 py-3 sm:px-6 lg:px-8 xl:flex-row xl:items-end xl:justify-between">
+                    <div class="flex min-w-0 items-start gap-3">
+                        <button aria-label="Open navigation" class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-200 md:hidden" type="button" onclick="toggleAdminSidebar()">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M4 7h16M4 12h16M4 17h16"></path>
+                            </svg>
+                        </button>
+                        <div class="min-w-0">
+                            <p class="admin-kicker">{% block header_kicker %}Operations{% endblock %}</p>
+                            <h1 class="admin-page-title mt-1 text-[1.95rem] font-semibold leading-none text-white">{% block header_title %}Admin Panel{% endblock %}</h1>
+                            <p class="mt-1.5 max-w-3xl text-sm text-slate-400">{% block header_subtitle %}Operational visibility for pooled API key routing.{% endblock %}</p>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="admin-toolbar-pill">
+                            <span class="admin-status-dot bg-emerald-400"></span>
+                            Auto refresh 30s
+                        </span>
+                        <span class="admin-toolbar-pill">{{ username | default("admin") }}</span>
+                        <button type="button" class="admin-button" onclick="logoutAdmin()">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M15 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H3"></path>
+                            </svg>
+                            <span>Logout</span>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <main class="flex-1 overflow-y-auto">
+                <div class="admin-content-dense mx-auto max-w-[1600px] px-4 py-4 sm:px-6 lg:px-8">
+                    {% block content %}{% endblock %}
+                </div>
+            </main>
         </div>
-        <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-            <a href="/admin/dashboard" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-700 transition-colors {% if request and request.url.path == '/admin/dashboard' %}bg-gray-700 text-white font-medium{% else %}text-gray-300{% endif %}">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path></svg>
-                Dashboard
-            </a>
-            <a href="/admin/keys" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-700 transition-colors {% if request and request.url.path == '/admin/keys' %}bg-gray-700 text-white font-medium{% else %}text-gray-300{% endif %}">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
-                Keys
-            </a>
-            <a href="/admin/history" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-700 transition-colors {% if request and request.url.path == '/admin/history' %}bg-gray-700 text-white font-medium{% else %}text-gray-300{% endif %}">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                History
-            </a>
-            <a href="/admin/logs" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-700 transition-colors {% if request and request.url.path == '/admin/logs' %}bg-gray-700 text-white font-medium{% else %}text-gray-300{% endif %}">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414 1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                Logs
-            </a>
-        </nav>
-    </aside>
-
-    <div id="sidebar-backdrop" class="fixed inset-0 bg-black/50 z-0 hidden md:hidden" onclick="document.getElementById('sidebar').classList.add('hidden'); this.classList.add('hidden');"></div>
-
-    <div class="flex-1 flex flex-col h-screen overflow-hidden">
-        <header class="h-16 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-4 sm:px-6">
-            <div class="flex items-center">
-                <button class="md:hidden text-gray-400 hover:text-white mr-4 focus:outline-none" onclick="document.getElementById('sidebar').classList.toggle('hidden'); document.getElementById('sidebar').classList.toggle('absolute'); document.getElementById('sidebar').classList.toggle('h-full'); document.getElementById('sidebar-backdrop').classList.toggle('hidden');">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-                </button>
-                <h1 class="text-xl font-semibold text-white">{% block header_title %}Admin Panel{% endblock %}</h1>
-            </div>
-            <form method="POST" action="/admin/api/logout" class="m-0">
-                <button type="submit" class="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 focus:ring-offset-gray-800 transition-colors">
-                    Logout
-                </button>
-            </form>
-        </header>
-
-        <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-900 p-4 sm:p-6 lg:p-8">
-            <div class="max-w-7xl mx-auto">
-                {% block content %}{% endblock %}
-            </div>
-        </main>
     </div>
 </body>
 </html>

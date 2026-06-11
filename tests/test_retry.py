@@ -361,3 +361,117 @@ class TestRetryManager:
 
         # Verify header was set
         assert headers["Authorization"] == "Bearer sk-test-key-12345"
+
+    @pytest.mark.asyncio
+    async def test_stream_setup_retries_before_first_chunk(
+        self, retry_manager, mock_selector, mock_handler, mock_proxy
+    ):
+        class DummyResponse:
+            def __init__(self, status_code, chunks=None, body=b""):
+                self.status_code = status_code
+                self.headers = {"content-type": "text/event-stream"}
+                self._chunks = chunks or []
+                self._body = body
+
+            async def aread(self):
+                return self._body
+
+            async def aiter_bytes(self):
+                for chunk in self._chunks:
+                    yield chunk
+
+        class DummyContext:
+            def __init__(self, response):
+                self.response = response
+                self.exited = False
+
+            async def __aenter__(self):
+                return self.response
+
+            async def __aexit__(self, exc_type, exc, tb):
+                self.exited = True
+                return False
+
+        first_key = KeyState(key="first-key")
+        second_key = KeyState(key="second-key")
+        first_ctx = DummyContext(DummyResponse(status_code=429, body=b'{"error":"rate"}'))
+        second_ctx = DummyContext(
+            DummyResponse(
+                status_code=200,
+                chunks=[
+                    b'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n',
+                    b"data: [DONE]\n\n",
+                ],
+            )
+        )
+
+        mock_selector.acquire_stream_lease.side_effect = [first_key, second_key]
+        mock_proxy.forward_stream.side_effect = [first_ctx, second_ctx]
+        mock_handler.detect_cooldown.side_effect = [
+            CooldownInfo(hours=4, reason="rate_limit"),
+            None,
+        ]
+
+        result = await retry_manager.prepare_stream_with_retry(
+            method="POST",
+            path="/v1/chat/completions",
+            headers={},
+            body={"stream": True},
+            proxy=mock_proxy,
+            request_id="stream-request-id",
+        )
+
+        assert result.success is True
+        assert result.attempts == 2
+        assert result.selected_key is second_key
+        assert result.first_chunk == b'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n'
+        mock_selector.release_stream_lease.assert_called_once_with("first-key")
+
+    @pytest.mark.asyncio
+    async def test_stream_setup_returns_non_retry_upstream_error_without_rotating(
+        self, retry_manager, mock_selector, mock_handler, mock_proxy
+    ):
+        class DummyResponse:
+            def __init__(self, status_code, body):
+                self.status_code = status_code
+                self.headers = {"content-type": "application/json"}
+                self._body = body
+
+            async def aread(self):
+                return self._body
+
+            async def aiter_bytes(self):
+                if False:
+                    yield b""
+
+        class DummyContext:
+            def __init__(self, response):
+                self.response = response
+
+            async def __aenter__(self):
+                return self.response
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+        key = KeyState(key="only-key")
+        ctx = DummyContext(DummyResponse(status_code=500, body=b'{"error":"boom"}'))
+
+        mock_selector.acquire_stream_lease.return_value = key
+        mock_proxy.forward_stream.return_value = ctx
+        mock_handler.detect_cooldown.return_value = None
+
+        result = await retry_manager.prepare_stream_with_retry(
+            method="POST",
+            path="/v1/chat/completions",
+            headers={},
+            body={"stream": True},
+            proxy=mock_proxy,
+            request_id="stream-request-id",
+        )
+
+        assert result.success is False
+        assert result.error_status_code == 500
+        assert result.error_body == b'{"error":"boom"}'
+        mock_selector.acquire_stream_lease.assert_called_once()
+        mock_selector.release_stream_lease.assert_called_once_with("only-key")

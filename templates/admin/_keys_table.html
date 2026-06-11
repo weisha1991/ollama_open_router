@@ -1,63 +1,78 @@
-<div class="bg-gray-800 rounded-lg border border-gray-700 shadow-sm overflow-hidden">
+<div class="admin-panel rounded-lg overflow-hidden">
+    <div class="flex items-start justify-between gap-4 border-b border-white/6 px-4 py-3.5">
+        <div>
+            <h3 class="font-display text-xl font-semibold text-white">Pool Members</h3>
+            <p class="mt-1 text-sm text-slate-400">Status, cooldown timing, and operator controls for each key.</p>
+        </div>
+        <div class="admin-toolbar-pill">Updated every 30 seconds</div>
+    </div>
+    {% if keys %}
     <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-700">
-            <thead class="bg-gray-900">
+        <table class="admin-table admin-table-dense">
+            <thead>
                 <tr>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Key ID</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Cooldown Until</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Reason</th>
-                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                    <th scope="col">Key ID</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Cooldown</th>
+                    <th scope="col">Reason</th>
+                    <th scope="col" class="text-right">Actions</th>
                 </tr>
             </thead>
-            <tbody class="bg-gray-800 divide-y divide-gray-700">
+            <tbody>
                 {% for key in keys %}
-                <tr id="key-row-{{ key.id }}" class="{% if key.is_last_used %}bg-cyan-900/20{% endif %}">
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-200">
-                        {{ key.masked_key | default('sk-...XXXX') }}
-                        {% if key.is_last_used %}
-                        <span class="ml-2 px-1.5 py-0.5 text-[10px] leading-none font-semibold rounded bg-cyan-800/60 text-cyan-300 border border-cyan-700">IN USE</span>
-                        {% endif %}
+                <tr id="key-row-{{ key.id }}"{% if key.is_last_used %} class="bg-sky-500/5"{% endif %}>
+                    <td class="whitespace-nowrap">
+                        <div class="flex items-center gap-3">
+                            <span class="font-semibold text-white">{{ key.masked_key | default('sk-...XXXX') }}</span>
+                            {% if key.is_last_used %}
+                            <span class="admin-badge admin-badge-neutral">In Use</span>
+                            {% endif %}
+                        </div>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                    <td class="whitespace-nowrap">
                         {% if key.status == 'available' %}
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-900/50 text-green-400 border border-green-800">Available</span>
+                        <span class="admin-badge admin-badge-success">Available</span>
                         {% elif key.status == 'disabled' %}
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-900/50 text-red-400 border border-red-800">Disabled</span>
+                        <span class="admin-badge admin-badge-danger">Disabled</span>
                         {% else %}
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-900/50 text-amber-400 border border-amber-800">Cooldown</span>
+                        <span class="admin-badge admin-badge-warning">Cooldown</span>
                         {% endif %}
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
-                        {{ key.cooldown_until | default('-') }}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
-                        {{ key.reason | default('-') }}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        {% if key.status == 'disabled' %}
-                        <button hx-post="/admin/api/keys/{{ key.id }}/reset" hx-confirm="Re-enable this key?" hx-swap="none" class="text-blue-400 hover:text-blue-300 mr-3 transition-colors">
-                            Enable
-                        </button>
-                        {% else %}
-                        <button hx-post="/admin/api/keys/{{ key.id }}/disable" hx-confirm="Disable this key? It will be excluded from rotation until re-enabled." hx-swap="none" class="text-amber-400 hover:text-amber-300 mr-3 transition-colors">
-                            Disable
-                        </button>
+                    <td class="whitespace-nowrap text-slate-300">
+                        <div>{{ key.cooldown_label }}</div>
+                        {% if key.cooldown_until_display and key.cooldown_until_display != '-' %}
+                        <div class="mt-1 text-xs text-slate-500">{{ key.cooldown_until_display }}</div>
                         {% endif %}
-                        <button hx-post="/admin/api/keys/{{ key.id }}/reset" hx-confirm="Reset this key to available?" hx-swap="none" class="text-blue-400 hover:text-blue-300 mr-3 transition-colors">
-                            Reset
-                        </button>
-                        <button hx-delete="/admin/api/keys/{{ key.id }}" hx-confirm="Are you sure you want to delete this key?" hx-swap="none" class="text-red-400 hover:text-red-300 transition-colors">
-                            Delete
-                        </button>
+                    </td>
+                    <td class="text-slate-400">
+                        {{ key.reason | default('Ready for routing') }}
+                    </td>
+                    <td class="whitespace-nowrap text-right">
+                        <div class="flex items-center justify-end gap-1.5 text-sm font-semibold">
+                            {% if key.status == 'disabled' %}
+                            <button hx-post="/admin/api/keys/{{ key.id }}/reset" hx-confirm="Re-enable this key?" hx-swap="none" class="rounded-md border border-sky-400/20 px-3 py-2 text-sky-300 transition hover:border-sky-300/30 hover:bg-sky-400/10 hover:text-sky-100">
+                                Enable
+                            </button>
+                            {% else %}
+                            <button hx-post="/admin/api/keys/{{ key.id }}/disable" hx-confirm="Disable this key? It will be excluded from rotation until re-enabled." hx-swap="none" class="rounded-md border border-amber-400/20 px-3 py-2 text-amber-300 transition hover:border-amber-300/30 hover:bg-amber-400/10 hover:text-amber-100">
+                                Disable
+                            </button>
+                            {% endif %}
+                            <button hx-post="/admin/api/keys/{{ key.id }}/reset" hx-confirm="Reset this key to available?" hx-swap="none" class="rounded-md border border-white/10 px-3 py-2 text-slate-200 transition hover:border-sky-300/30 hover:bg-sky-400/10 hover:text-sky-100">
+                                Reset
+                            </button>
+                            <button hx-delete="/admin/api/keys/{{ key.id }}" hx-confirm="Are you sure you want to delete this key?" hx-swap="none" class="rounded-md border border-rose-400/20 px-3 py-2 text-rose-300 transition hover:border-rose-300/30 hover:bg-rose-400/10 hover:text-rose-100">
+                                Delete
+                            </button>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
-    {% if not keys %}
-    <div class="px-6 py-8 text-center text-gray-400 text-sm">
+    {% else %}
+    <div class="px-4 py-10 text-center text-sm text-slate-500">
         No keys found. Add one above.
     </div>
     {% endif %}

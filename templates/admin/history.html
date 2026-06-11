@@ -2,9 +2,44 @@
 
 {% block title %}History - Ollama Router Admin{% endblock %}
 {% block header_title %}Request History{% endblock %}
+{% block header_subtitle %}Inspect recent router traffic, response codes, and latency in one monitoring view.{% endblock %}
 
 {% block content %}
-<div id="history-container" hx-get="/admin/api/history/table" hx-trigger="every 30s" hx-swap="innerHTML">
-    {% include "admin/_history_table.html" %}
-</div>
+<section class="space-y-4">
+    <section class="admin-page-intro-compact admin-panel rounded-lg p-4">
+        <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div class="min-w-0 flex-1">
+                <p class="admin-kicker">Monitoring</p>
+                <h2 class="mt-1 font-display text-2xl font-semibold text-white">Recent Traffic</h2>
+                <p class="mt-1.5 max-w-3xl text-sm leading-6 text-slate-400">Use this view to spot error bursts, request spikes, and latency changes before they start affecting routing quality.</p>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-2 xl:w-[560px] xl:grid-cols-4">
+                <div class="admin-panel-soft rounded-lg px-4 py-3.5">
+                    <p class="text-xs font-semibold uppercase text-slate-500">Total Requests</p>
+                    <p class="mt-2 font-display text-2xl font-semibold text-white">{{ history_summary.total | default(0) }}</p>
+                    <p class="mt-1.5 text-sm text-slate-500">Captured entries</p>
+                </div>
+                <div class="admin-panel-soft rounded-lg px-4 py-3.5">
+                    <p class="text-xs font-semibold uppercase text-slate-500">Successful</p>
+                    <p class="mt-2 font-display text-2xl font-semibold text-emerald-300">{{ history_summary.success | default(0) }}</p>
+                    <p class="mt-1.5 text-sm text-slate-500">2xx responses</p>
+                </div>
+                <div class="admin-panel-soft rounded-lg px-4 py-3.5">
+                    <p class="text-xs font-semibold uppercase text-slate-500">Client Errors</p>
+                    <p class="mt-2 font-display text-2xl font-semibold text-amber-300">{{ history_summary.client_errors | default(0) }}</p>
+                    <p class="mt-1.5 text-sm text-slate-500">4xx responses</p>
+                </div>
+                <div class="admin-panel-soft rounded-lg px-4 py-3.5">
+                    <p class="text-xs font-semibold uppercase text-slate-500">Avg Latency</p>
+                    <p class="mt-2 font-display text-2xl font-semibold text-sky-200">{{ history_summary.avg_latency | default(0) }}ms</p>
+                    <p class="mt-1.5 text-sm text-slate-500">Across the current log window</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div id="history-container" hx-get="/admin/api/history/table" hx-trigger="load, every 30s" hx-swap="innerHTML">
+        {% include "admin/_history_table.html" %}
+    </div>
+</section>
 {% endblock %}

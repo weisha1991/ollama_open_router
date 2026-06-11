@@ -4,69 +4,124 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Ollama Router Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
     <script>
         tailwind.config = {
-            darkMode: 'class',
+            darkMode: "class",
             theme: {
                 extend: {
-                    colors: {
-                        gray: {
-                            850: '#1f2937',
-                            900: '#111827',
-                        }
-                    }
-                }
-            }
+                    fontFamily: {
+                        sans: ["Manrope", "ui-sans-serif", "system-ui", "sans-serif"],
+                        display: ["Outfit", "Manrope", "ui-sans-serif", "system-ui", "sans-serif"],
+                    },
+                },
+            },
         }
     </script>
     <style>
-        body { background-color: #111827; color: #f3f4f6; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            color: #e9edf8;
+            font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+            background:
+                radial-gradient(circle at top, rgba(95, 79, 255, 0.18), transparent 24%),
+                linear-gradient(180deg, #09111f 0%, #060b16 48%, #03070d 100%);
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0.32;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 26px 26px;
+            mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.5), transparent 92%);
+        }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-100 min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-md w-full space-y-8 bg-gray-800 p-8 rounded-xl shadow-lg border border-gray-700">
-        <div>
-            <h2 class="mt-6 text-center text-3xl font-extrabold text-white tracking-wide">
-                Ollama Router Admin
-            </h2>
-            <p class="mt-2 text-center text-sm text-gray-400">
-                Sign in to your account
-            </p>
+<body class="admin-login-shell">
+    <main class="relative mx-auto flex min-h-screen w-full max-w-7xl items-center justify-center px-6 py-16">
+        <div class="grid w-full items-center gap-10 lg:grid-cols-[minmax(0,1.15fr)_420px]">
+            <section class="hidden lg:block">
+                <div class="max-w-2xl">
+                    <p class="text-sm font-semibold uppercase tracking-[0] text-violet-300/90">Ollama Router</p>
+                    <h1 class="mt-5 font-display text-5xl font-semibold leading-tight text-white">Operational visibility for pooled API routing.</h1>
+                    <p class="mt-6 max-w-xl text-lg leading-8 text-slate-300">Monitor key availability, recent requests, cooldown states, and system activity from one focused control surface.</p>
+                </div>
+
+                <div class="mt-10 grid gap-4 sm:grid-cols-3">
+                    <div class="rounded-[1.6rem] border border-white/8 bg-[rgba(11,19,35,0.75)] p-5 shadow-[0_20px_60px_rgba(5,10,20,0.35)] backdrop-blur-xl">
+                        <p class="text-sm text-slate-400">Total Keys</p>
+                        <p class="mt-4 font-display text-3xl font-semibold text-white">16</p>
+                        <p class="mt-2 text-sm text-slate-500">Managed in one pool</p>
+                    </div>
+                    <div class="rounded-[1.6rem] border border-emerald-400/15 bg-[rgba(11,19,35,0.75)] p-5 shadow-[0_20px_60px_rgba(5,10,20,0.35)] backdrop-blur-xl">
+                        <p class="text-sm text-slate-400">Ready</p>
+                        <p class="mt-4 font-display text-3xl font-semibold text-emerald-300">24h</p>
+                        <p class="mt-2 text-sm text-slate-500">Live visibility</p>
+                    </div>
+                    <div class="rounded-[1.6rem] border border-violet-400/15 bg-[rgba(11,19,35,0.75)] p-5 shadow-[0_20px_60px_rgba(5,10,20,0.35)] backdrop-blur-xl">
+                        <p class="text-sm text-slate-400">Realtime</p>
+                        <p class="mt-4 font-display text-3xl font-semibold text-violet-200">SSE</p>
+                        <p class="mt-2 text-sm text-slate-500">Streaming logs</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="rounded-[2rem] border border-violet-400/15 bg-[rgba(10,18,33,0.9)] p-7 shadow-[0_28px_90px_rgba(4,8,17,0.48)] backdrop-blur-2xl sm:p-9">
+                <div class="flex items-center gap-4">
+                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-400/20 bg-violet-500/10 text-violet-200">
+                        <svg fill="none" viewBox="0 0 24 24" class="h-7 w-7">
+                            <path d="M12 3 7 8v8l5 5 5-5V8l-5-5Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"></path>
+                            <path d="M10 9h4m-4 3h4m-4 3h2" stroke="currentColor" stroke-linecap="round" stroke-width="1.7"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-sm font-semibold uppercase tracking-[0] text-violet-300/90">Admin Access</p>
+                        <h2 class="mt-1 font-display text-3xl font-semibold text-white">Sign in</h2>
+                    </div>
+                </div>
+
+                <p class="mt-6 text-sm leading-7 text-slate-400">Use your configured administrator credentials to access dashboard, keys, history, and log controls.</p>
+
+                <form class="mt-8 space-y-4" hx-post="/admin/api/login" hx-target="#error-message" hx-swap="innerHTML">
+                    <div>
+                        <label for="username" class="mb-2 block text-sm font-medium text-slate-300">Username</label>
+                        <input id="username" name="username" type="text" required class="w-full rounded-2xl border border-white/10 bg-[rgba(7,12,24,0.82)] px-4 py-3 text-white outline-none transition focus:border-violet-400/60 focus:ring-4 focus:ring-violet-500/10" placeholder="admin">
+                    </div>
+                    <div>
+                        <label for="password" class="mb-2 block text-sm font-medium text-slate-300">Password</label>
+                        <input id="password" name="password" type="password" required class="w-full rounded-2xl border border-white/10 bg-[rgba(7,12,24,0.82)] px-4 py-3 text-white outline-none transition focus:border-violet-400/60 focus:ring-4 focus:ring-violet-500/10" placeholder="••••••••">
+                    </div>
+
+                    <div id="error-message" class="min-h-[20px] text-sm text-red-300"></div>
+
+                    <button type="submit" class="inline-flex w-full items-center justify-center rounded-2xl border border-violet-400/40 bg-violet-500/90 px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-[1px] hover:bg-violet-400">
+                        Sign in
+                    </button>
+                </form>
+            </section>
         </div>
-        <form class="mt-8 space-y-6" hx-post="/admin/api/login" hx-target="#error-message" hx-swap="innerHTML">
-            <div class="rounded-md shadow-sm -space-y-px">
-                <div>
-                    <label for="username" class="sr-only">Username</label>
-                    <input id="username" name="username" type="text" required class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-600 bg-gray-700 placeholder-gray-400 text-white rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" placeholder="Username">
-                </div>
-                <div>
-                    <label for="password" class="sr-only">Password</label>
-                    <input id="password" name="password" type="password" required class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-600 bg-gray-700 placeholder-gray-400 text-white rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" placeholder="Password">
-                </div>
-            </div>
-
-            <div id="error-message" class="text-red-400 text-sm text-center min-h-[20px]"></div>
-
-            <div>
-                <button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-gray-800 transition-colors">
-                    Sign in
-                </button>
-            </div>
-        </form>
-    </div>
+    </main>
     <script>
-        document.body.addEventListener('htmx:responseError', function(evt) {
+        document.body.addEventListener("htmx:responseError", function(evt) {
             if (evt.detail.xhr.status === 401 || evt.detail.xhr.status === 403) {
-                document.getElementById('error-message').innerText = 'Invalid username or password';
+                document.getElementById("error-message").innerText = "Invalid username or password";
             } else {
-                document.getElementById('error-message').innerText = 'An error occurred. Please try again.';
+                document.getElementById("error-message").innerText = "An error occurred. Please try again.";
             }
         });
-        document.body.addEventListener('htmx:afterRequest', function(evt) {
+        document.body.addEventListener("htmx:afterRequest", function(evt) {
             if (evt.detail.successful) {
-                window.location.href = '/admin/dashboard';
+                window.location.href = "/admin/dashboard";
             }
         });
     </script>

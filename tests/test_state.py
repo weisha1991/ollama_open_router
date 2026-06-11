@@ -172,3 +172,46 @@ def test_state_store_last_failed_key_null_persistence(tmp_path):
     store2 = StateStore(state_dir=str(tmp_path))
     store2.load()
     assert store2.last_failed_key is None
+
+
+def test_stream_lease_marks_key_busy_until_released():
+    keys = [KeyState(key="key1"), KeyState(key="key2")]
+    selector = KeySelector(keys=keys, max_concurrent_streams_per_key=2)
+
+    leased = selector.acquire_stream_lease()
+
+    assert leased is not None
+    assert leased.active_streams == 1
+    assert selector.get_active_streams(leased.key) == 1
+
+    selector.release_stream_lease(leased.key)
+
+    assert leased.active_streams == 0
+    assert selector.get_active_streams(leased.key) == 0
+
+
+def test_stream_selection_skips_keys_at_capacity():
+    keys = [KeyState(key="key1"), KeyState(key="key2")]
+    selector = KeySelector(keys=keys, max_concurrent_streams_per_key=1)
+
+    first = selector.acquire_stream_lease()
+    second = selector.acquire_stream_lease()
+    third = selector.acquire_stream_lease()
+
+    assert first is not None
+    assert second is not None
+    assert first.key != second.key
+    assert third is None
+
+
+def test_stream_selection_prefers_lower_load():
+    keys = [KeyState(key="key1"), KeyState(key="key2"), KeyState(key="key3")]
+    keys[0].active_streams = 2
+    keys[1].active_streams = 1
+
+    selector = KeySelector(keys=keys, max_concurrent_streams_per_key=3)
+
+    leased = selector.acquire_stream_lease()
+
+    assert leased is not None
+    assert leased.key == "key3"

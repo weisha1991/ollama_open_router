@@ -1,41 +1,293 @@
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-    <div class="bg-gray-800 rounded-lg p-6 border border-gray-700 shadow-sm flex items-center">
-        <div class="p-3 rounded-full bg-blue-900/50 text-blue-400 mr-4">
-            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
-        </div>
-        <div>
-            <p class="text-sm font-medium text-gray-400">Total Keys</p>
-            <p class="text-2xl font-bold text-white">{{ stats.total_keys | default(0) }}</p>
-        </div>
-    </div>
+{% set total_keys = stats.total_keys | default(0) %}
+{% set available = dashboard.distribution.available | default(0) %}
+{% set cooldown = dashboard.distribution.cooldown | default(0) %}
+{% set disabled = dashboard.distribution.disabled | default(0) %}
+{% set total_requests = stats.total_requests | default(0) %}
+{% set request_summary = dashboard.request_summary | default({}) %}
+{% set request_state = request_summary.state | default("empty") %}
+{% set request_total = request_summary.total | default(0) %}
+{% set request_peak = request_summary.peak | default(0) %}
+{% set request_latest = request_summary.latest | default(0) %}
+{% set request_latest_label = request_summary.latest_label | default("--:--") %}
+{% set request_bucket_count = request_summary.bucket_count | default(0) %}
+{% set distribution_total = total_keys if total_keys > 0 else 1 %}
+{% set available_pct = (available / distribution_total * 100) %}
+{% set cooldown_pct = (cooldown / distribution_total * 100) %}
+{% set disabled_pct = (disabled / distribution_total * 100) %}
 
-    <div class="bg-gray-800 rounded-lg p-6 border border-gray-700 shadow-sm flex items-center">
-        <div class="p-3 rounded-full bg-green-900/50 text-green-400 mr-4">
-            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-        </div>
-        <div>
-            <p class="text-sm font-medium text-gray-400">Available Keys</p>
-            <p class="text-2xl font-bold text-white">{{ stats.available_keys | default(0) }}</p>
-        </div>
-    </div>
+<div class="space-y-4">
+    <section class="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(340px,0.95fr)]">
+        <article class="admin-dashboard-primary admin-panel rounded-lg p-5">
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-white/6 pb-4">
+                <div>
+                    <h2 class="font-display text-xl font-semibold text-white">Request Overview</h2>
+                    <p class="mt-1 text-sm text-slate-400">Recent request traffic based on recorded history.</p>
+                </div>
+                <div class="admin-toolbar-pill">
+                    {% if request_state == "ready" %}
+                    Last {{ request_bucket_count }} buckets
+                    {% elif request_state == "single" %}
+                    Building trend
+                    {% else %}
+                    Awaiting data
+                    {% endif %}
+                </div>
+            </div>
 
-    <div class="bg-gray-800 rounded-lg p-6 border border-gray-700 shadow-sm flex items-center">
-        <div class="p-3 rounded-full bg-amber-900/50 text-amber-400 mr-4">
-            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-        </div>
-        <div>
-            <p class="text-sm font-medium text-gray-400">Cooldown Keys</p>
-            <p class="text-2xl font-bold text-white">{{ stats.cooldown_keys | default(0) }}</p>
-        </div>
-    </div>
+            <div class="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_208px]">
+                <div class="rounded-lg border border-white/6 bg-[rgba(6,11,20,0.68)] p-4">
+                    {% if request_state == "ready" %}
+                    <div class="flex items-center justify-between text-xs text-slate-500">
+                        <span>Peak bucket: {{ request_peak }}</span>
+                        <span>Latest bucket: {{ request_latest }}</span>
+                    </div>
+                    <svg class="mt-4 h-[220px] w-full" viewBox="0 0 520 220" fill="none" preserveAspectRatio="none">
+                        <path d="M0 188H520" stroke="rgba(148,163,184,0.18)" stroke-width="1"></path>
+                        <path d="M0 142H520" stroke="rgba(148,163,184,0.08)" stroke-width="1"></path>
+                        <path d="M0 96H520" stroke="rgba(148,163,184,0.08)" stroke-width="1"></path>
+                        <path d="M0 50H520" stroke="rgba(148,163,184,0.08)" stroke-width="1"></path>
+                        <polyline points="{% for point in dashboard.request_overview %}{{ point.x }},{{ point.y + 16 }} {% endfor %}" stroke="#5fa8ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                        {% for point in dashboard.request_overview %}
+                        <circle cx="{{ point.x }}" cy="{{ point.y + 16 }}" r="4.5" fill="#5fa8ff"></circle>
+                        {% endfor %}
+                    </svg>
+                    <div class="mt-3 grid grid-cols-{{ dashboard.request_overview|length if dashboard.request_overview|length < 6 else 6 }} gap-2 text-xs text-slate-500">
+                        {% for point in dashboard.request_overview[-6:] %}
+                        <span class="{% if loop.last %}text-right{% elif loop.first %}text-left{% else %}text-center{% endif %}">{{ point.label }}</span>
+                        {% endfor %}
+                    </div>
+                    {% elif request_state == "single" %}
+                    <div class="flex min-h-[260px] items-center justify-center">
+                        <div class="max-w-md text-center">
+                            <p class="text-sm font-semibold text-slate-100">Collecting a fuller history</p>
+                            <p class="mt-2 text-sm leading-6 text-slate-400">The router has one recorded interval so far. This panel switches to a trend chart after the next bucket arrives.</p>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="flex min-h-[260px] items-center justify-center">
+                        <div class="max-w-md text-center">
+                            <p class="text-sm font-semibold text-slate-100">No request data recorded yet.</p>
+                            <p class="mt-2 text-sm leading-6 text-slate-400">Once the router starts serving traffic, this view will chart recent activity and expose spikes at a glance.</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
 
-    <div class="bg-gray-800 rounded-lg p-6 border border-gray-700 shadow-sm flex items-center">
-        <div class="p-3 rounded-full bg-purple-900/50 text-purple-400 mr-4">
-            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                <div class="grid content-start gap-3">
+                    <div class="admin-panel-soft rounded-lg p-3.5">
+                        <p class="text-xs font-semibold uppercase text-slate-500">Bucketed Requests</p>
+                        <p class="mt-2 font-display text-3xl font-semibold text-white">{{ request_total }}</p>
+                        <p class="mt-1.5 text-sm text-slate-400">Requests represented in the current overview window.</p>
+                    </div>
+                    <div class="admin-panel-soft rounded-lg p-3.5">
+                        <p class="text-xs font-semibold uppercase text-slate-500">Peak Bucket</p>
+                        <p class="mt-2 font-display text-3xl font-semibold text-white">{{ request_peak }}</p>
+                        <p class="mt-1.5 text-sm text-slate-400">Highest request count observed in a single overview bucket.</p>
+                    </div>
+                    <div class="admin-panel-soft rounded-lg p-3.5">
+                        <p class="text-xs font-semibold uppercase text-slate-500">Latest Bucket</p>
+                        <p class="mt-2 font-display text-3xl font-semibold text-white">{{ request_latest }}</p>
+                        <p class="mt-1.5 text-sm text-slate-400">Most recent bucket at {{ request_latest_label }}.</p>
+                    </div>
+                </div>
+            </div>
+        </article>
+
+        <div class="grid content-start gap-4">
+            <section class="grid gap-3 sm:grid-cols-2">
+                <article class="admin-kpi-secondary admin-panel-soft rounded-lg p-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <p class="text-xs font-semibold uppercase text-slate-500">Total Keys</p>
+                            <p class="mt-2 font-display text-3xl font-semibold text-white">{{ total_keys }}</p>
+                            <p class="mt-1.5 text-sm text-slate-500">Configured credentials</p>
+                        </div>
+                        <div class="flex h-10 w-10 items-center justify-center rounded-lg border border-sky-400/20 bg-sky-400/10 text-sky-300">
+                            <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M14 7a4 4 0 1 1 2.31 3.627L14 13H9v2H7v2H4v-3.17l5.05-5.05A4 4 0 0 1 14 7Z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </article>
+                <article class="admin-kpi-secondary admin-panel-soft rounded-lg p-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <p class="text-xs font-semibold uppercase text-slate-500">Available Keys</p>
+                            <p class="mt-2 font-display text-3xl font-semibold text-white">{{ available }}</p>
+                            <p class="mt-1.5 text-sm text-slate-500">Ready for routing</p>
+                        </div>
+                        <div class="flex h-10 w-10 items-center justify-center rounded-lg border border-emerald-400/20 bg-emerald-400/10 text-emerald-300">
+                            <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="m8.5 12.5 2.5 2.5 4.5-5m5 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </article>
+                <article class="admin-kpi-secondary admin-panel-soft rounded-lg p-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <p class="text-xs font-semibold uppercase text-slate-500">Cooldown Keys</p>
+                            <p class="mt-2 font-display text-3xl font-semibold text-white">{{ cooldown }}</p>
+                            <p class="mt-1.5 text-sm text-slate-500">Waiting to recover</p>
+                        </div>
+                        <div class="flex h-10 w-10 items-center justify-center rounded-lg border border-amber-400/20 bg-amber-400/10 text-amber-300">
+                            <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 7v5l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </article>
+                <article class="admin-kpi-secondary admin-panel-soft rounded-lg p-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <p class="text-xs font-semibold uppercase text-slate-500">Total Requests</p>
+                            <p class="mt-2 font-display text-3xl font-semibold text-white">{{ total_requests }}</p>
+                            <p class="mt-1.5 text-sm text-slate-500">Captured in memory</p>
+                        </div>
+                        <div class="flex h-10 w-10 items-center justify-center rounded-lg border border-violet-400/20 bg-violet-400/10 text-violet-300">
+                            <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 16 11 10l4 4 5-6M15 8h5v5"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </article>
+            </section>
+
+            <article class="admin-panel rounded-lg p-4">
+                <div class="border-b border-white/6 pb-3">
+                    <h2 class="font-display text-xl font-semibold text-white">Key Status Distribution</h2>
+                    <p class="mt-1 text-sm text-slate-400">Live availability split across the current key pool.</p>
+                </div>
+
+                <div class="mt-4 grid gap-4 lg:grid-cols-[160px_minmax(0,1fr)] lg:items-center">
+                    <div class="mx-auto">
+                        <div class="flex h-40 w-40 items-center justify-center rounded-full border border-white/8 bg-[rgba(6,11,20,0.72)]"
+                             style="background:
+                                radial-gradient(circle at center, rgba(6,11,20,1) 0 56%, transparent 57% 100%),
+                                conic-gradient(
+                                    #38c172 0 {{ available_pct }}%,
+                                    #f2b44f {{ available_pct }}% {{ available_pct + cooldown_pct }}%,
+                                    #ee6b73 {{ available_pct + cooldown_pct }}% {{ available_pct + cooldown_pct + disabled_pct }}%,
+                                    rgba(148,163,184,0.16) {{ available_pct + cooldown_pct + disabled_pct }}% 100%
+                                );">
+                            <div class="text-center">
+                                <p class="font-display text-3xl font-semibold text-white">{{ total_keys }}</p>
+                                <p class="mt-1 text-sm text-slate-400">Total Keys</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2.5">
+                        <div class="flex items-center justify-between rounded-lg border border-white/6 bg-white/[0.03] px-4 py-3">
+                            <div class="flex items-center gap-3">
+                                <span class="admin-status-dot bg-emerald-400"></span>
+                                <span class="text-sm text-slate-300">Available</span>
+                            </div>
+                            <span class="text-sm font-semibold text-slate-100">{{ available }} ({{ "%.0f"|format(available_pct) }}%)</span>
+                        </div>
+                        <div class="flex items-center justify-between rounded-lg border border-white/6 bg-white/[0.03] px-4 py-3">
+                            <div class="flex items-center gap-3">
+                                <span class="admin-status-dot bg-amber-400"></span>
+                                <span class="text-sm text-slate-300">Cooldown</span>
+                            </div>
+                            <span class="text-sm font-semibold text-slate-100">{{ cooldown }} ({{ "%.0f"|format(cooldown_pct) }}%)</span>
+                        </div>
+                        <div class="flex items-center justify-between rounded-lg border border-white/6 bg-white/[0.03] px-4 py-3">
+                            <div class="flex items-center gap-3">
+                                <span class="admin-status-dot bg-rose-400"></span>
+                                <span class="text-sm text-slate-300">Disabled</span>
+                            </div>
+                            <span class="text-sm font-semibold text-slate-100">{{ disabled }} ({{ "%.0f"|format(disabled_pct) }}%)</span>
+                        </div>
+                    </div>
+                </div>
+            </article>
         </div>
-        <div>
-            <p class="text-sm font-medium text-gray-400">Total Requests</p>
-            <p class="text-2xl font-bold text-white">{{ stats.total_requests | default(0) }}</p>
-        </div>
-    </div>
+    </section>
+
+    <section class="grid gap-4 xl:grid-cols-2">
+        <article class="admin-panel rounded-lg overflow-hidden">
+            <div class="flex items-start justify-between gap-4 border-b border-white/6 px-4 py-3.5">
+                <div>
+                    <h2 class="font-display text-xl font-semibold text-white">Recent Keys</h2>
+                    <p class="mt-1 text-sm text-slate-400">Newest routing status across the current key pool.</p>
+                </div>
+                <a href="/admin/keys" class="text-sm font-semibold text-sky-300">Manage</a>
+            </div>
+            {% if dashboard.recent_keys %}
+            <div class="overflow-x-auto">
+                <table class="admin-table admin-table-dense">
+                    <thead>
+                        <tr>
+                            <th>Key</th>
+                            <th>Status</th>
+                            <th>Cooldown</th>
+                            <th>Note</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for key in dashboard.recent_keys %}
+                        <tr{% if key.is_last_used %} class="bg-sky-500/5"{% endif %}>
+                            <td>
+                                <div class="flex items-center gap-3">
+                                    <span class="font-semibold text-white">{{ key.masked_key }}</span>
+                                    {% if key.is_last_used %}
+                                    <span class="admin-badge admin-badge-neutral">In Use</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                {% if key.status == "available" %}
+                                <span class="admin-badge admin-badge-success">Available</span>
+                                {% elif key.status == "cooldown" %}
+                                <span class="admin-badge admin-badge-warning">Cooldown</span>
+                                {% else %}
+                                <span class="admin-badge admin-badge-danger">Disabled</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-slate-300">{{ key.cooldown_label }}</td>
+                            <td class="text-slate-400">{{ key.reason or "Ready for routing" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="px-4 py-10 text-center text-sm text-slate-500">
+                No keys configured yet.
+            </div>
+            {% endif %}
+        </article>
+
+        <article class="admin-panel rounded-lg overflow-hidden">
+            <div class="border-b border-white/6 px-4 py-3.5">
+                <h2 class="font-display text-xl font-semibold text-white">Recent Activity</h2>
+                <p class="mt-1 text-sm text-slate-400">Latest recorded upstream requests and outcomes.</p>
+            </div>
+            <div class="divide-y divide-white/6">
+                {% if dashboard.recent_activity %}
+                    {% for item in dashboard.recent_activity %}
+                    <div class="flex items-start justify-between gap-4 px-4 py-3.5">
+                        <div class="min-w-0">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="admin-badge admin-badge-neutral">{{ item.method }}</span>
+                                <p class="truncate text-sm font-semibold text-slate-100">{{ item.path }}</p>
+                            </div>
+                            <p class="mt-2 text-sm text-slate-500">{{ item.display_time }}{% if item.key_id %} • key {{ item.key_id }}{% endif %} • {{ item.latency }}ms</p>
+                        </div>
+                        {% if item.status >= 200 and item.status < 300 %}
+                        <span class="admin-badge admin-badge-success">{{ item.status }}</span>
+                        {% elif item.status >= 400 and item.status < 500 %}
+                        <span class="admin-badge admin-badge-warning">{{ item.status }}</span>
+                        {% else %}
+                        <span class="admin-badge admin-badge-danger">{{ item.status }}</span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="px-4 py-10 text-center text-sm text-slate-500">No recent activity recorded yet.</div>
+                {% endif %}
+            </div>
+        </article>
+    </section>
 </div>
